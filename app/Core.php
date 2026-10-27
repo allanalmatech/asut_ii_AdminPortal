@@ -55,7 +55,7 @@ final class Keys {
         if(!$key)throw new ApiError(503,'setup_required','Server signing keys are missing. Run setup.'); $this->rsa=$key;
         $settlement=$directory.'/settlement.key'; if($create&&!is_file($settlement))Security::atomic($settlement,random_bytes(32));
         $this->settlement=file_get_contents($settlement); if(strlen($this->settlement)!==32)throw new \RuntimeException('Invalid settlement key.');
-        if($create&&!is_file($directory.'/server-public-key.pem'))Security::atomic($directory.'/server-public-key.pem',$this->publicPem());
+        if($create&&(!is_file($directory.'/server-public-key.pem')||file_get_contents($directory.'/server-public-key.pem')!==$this->publicPem()))Security::atomic($directory.'/server-public-key.pem',$this->publicPem());
     }
     public function publicPem(): string { return openssl_pkey_get_details($this->rsa)['key']; }
     private static function b64(string $s): string { return rtrim(strtr(base64_encode($s),'+/','-_'),'='); }

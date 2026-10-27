@@ -22,6 +22,10 @@ trait AdminMethods {
         });
     }
     public function adminStatus(string $token): array {return $this->db->tx(function()use($token){$u=$this->adminSession($token);return ['success'=>true,'username'=>$u['username'],'csrfToken'=>$u['csrf']];});}
+    public function serverPublicKey(string $token): array {
+        $this->adminStatus($token);$pem=$this->keys->publicPem();
+        return ['success'=>true,'algorithm'=>'RS256','publicKey'=>$pem,'sha256'=>strtoupper(hash('sha256',$pem))];
+    }
     public function adminLogout(string $token,string $csrf): array {return $this->db->tx(function()use($token,$csrf){$this->adminSession($token,$csrf);$this->db->query('DELETE FROM {sessions} WHERE token_hash=?',[Security::tokenHash($token)]);return ['success'=>true];});}
     public function adminData(string $token): array {
         $this->adminStatus($token);$this->sweep();return $this->db->tx(function()use($token){

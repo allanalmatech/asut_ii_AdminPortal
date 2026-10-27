@@ -25,6 +25,7 @@ try {
     if(preg_match('~^client/unlocks/([a-fA-F0-9-]+)/complete$~D',$route,$m)&&$method==='POST')Web::json($store->complete($m[1],Web::body()));
     if($route==='admin/login'&&$method==='POST'){$result=$store->adminLogin(Web::body());Web::adminCookie($result['token'],time()+28800);Web::json($result['body']);}
     if($route==='admin/session'&&$method==='GET')Web::json($store->adminStatus($admin));
+    if($route==='admin/server-key'&&$method==='GET')Web::json($store->serverPublicKey($admin));
     if($route==='admin/data'&&$method==='GET')Web::json($store->adminData($admin));
     if($route==='admin/logout'&&$method==='POST'){$result=$store->adminLogout($admin,$csrf);Web::adminCookie('',time()-3600);Web::json($result);}
     if($route==='admin/clients'&&$method==='POST')Web::json($store->saveClient($admin,$csrf,null,Web::body()));

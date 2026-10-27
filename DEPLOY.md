@@ -17,6 +17,12 @@
 6. Sign in at the portal root. Configure tariffs, enable the implemented devices you want to offer, and create active clients with their authorized HWIDs. Hosted installation does not create demonstration client accounts or enable arbitrary prices for you.
 7. The client source `App Source Code/ManagedSystem/ClientAssets/client-config.json` field `apiBaseUrl` is configured for `https://almatechconsults.com/asut_admin/`. Rebuild/distribute the updated client when changing the host. The URL is not displayed or editable in the login form. The client validates the matching server public key and requires a reachable API before unlocking.
 
+If the host generated its own signing keys during setup, export its public key
+through the authenticated `GET api/admin/server-key` endpoint and pin that key
+in the client source before building. The response contains only the public
+key, never the private signing or settlement keys. Existing hosting keys remain
+on the server during code updates.
+
 ### Git updates on this host
 
 Pull the portal repository to update PHP, setup and schema code. Keep the host's
