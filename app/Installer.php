@@ -3,6 +3,19 @@ declare(strict_types=1);
 namespace Asut;
 
 final class Installer {
+    public static function preflight(array $cfg): void {
+        V::need(extension_loaded('pdo_mysql')&&extension_loaded('openssl'),503,'php_extensions','Enable the PHP pdo_mysql and openssl extensions before installing.');
+        $root=dirname(__DIR__);
+        foreach(['assets/device_catalog.json','schema.sql','app/openssl.cnf']as$file)
+            V::need(is_readable($root.'/'.$file),503,'setup_file_missing','Required setup file is missing: '.$file.'. Pull the latest portal repository or upload the complete hosting ZIP.');
+        try{$catalog=json_decode(file_get_contents($root.'/assets/device_catalog.json'),true,32,JSON_THROW_ON_ERROR);}
+        catch(\JsonException $e){throw new ApiError(503,'invalid_catalog','The device catalog is invalid. Restore assets/device_catalog.json from the release.');}
+        V::need(isset($catalog['devices'])&&is_array($catalog['devices'])&&count($catalog['devices'])>0,503,'invalid_catalog','The device catalog has no device entries. Restore assets/device_catalog.json from the release.');
+        $storage=rtrim((string)($cfg['storage_path']??''),'/\\');
+        V::need($storage!=='',503,'storage_configuration','Configure storage_path in config/local.php.');
+        if(!is_dir($storage))V::need(@mkdir($storage,0700,true),503,'storage_permissions','PHP cannot create private storage. Create the configured storage directory and grant the hosting PHP user write access.');
+        V::need(is_writable($storage),503,'storage_permissions','Private storage is not writable by PHP. Grant the hosting PHP user write access to the configured storage directory.');
+    }
     public static function requireDatabaseVersion(string $raw): void {
         $maria=stripos($raw,'MariaDB')!==false;$version='';
         // Some hosts advertise the MySQL protocol prefix 5.5.5 before the
@@ -12,6 +25,7 @@ final class Installer {
         V::need($version!==''&&version_compare($version,$maria?'10.3.0':'8.0.16','>='),500,'database_version','Use MariaDB 10.3+ (including 10.3.39-MariaDB-cll-lve) or MySQL 8.0.16+.');
     }
     public static function install(array $cfg,string $name,string $password,?array $demo=null): Keys {
+        self::preflight($cfg);
         $db=new Db($cfg);$storage=rtrim($cfg['storage_path'],'/\\');
         if(!is_dir($storage)&&!mkdir($storage,0700,true))throw new \RuntimeException('Cannot create private storage.');
         $guard=fopen($storage.'/setup.guard','c+');if(!$guard||!flock($guard,LOCK_EX))throw new \RuntimeException('Cannot lock installation.');

@@ -20,10 +20,14 @@
 ### Git updates on this host
 
 Pull the portal repository to update PHP, setup and schema code. Keep the host's
-existing `config/local.php` and `storage/keys`. The repository excludes local
-configuration, keys, binary assets and patch ZIPs; install those from the full
-hosting ZIP for a first deployment. When this compatibility update is pulled,
-reload `setup.php` and run installation with the configured setup key.
+existing `config/local.php` and `storage/keys`. The repository includes the
+required device catalog, images and patch ZIPs; local configuration and private
+keys are excluded. For a first deployment with an existing client public-key
+pin, install the matching `storage/keys` from the owner-only hosting ZIP.
+Reload `setup.php` after pulling and run installation with the configured setup
+key. Setup checks for missing catalog files, PHP extensions and writable storage.
+After submitting a valid setup key, any database/installation error is shown
+to the installer instead of only the generic configuration message.
 
 The Windows client folder contains only the server's public key. Keep the administrator hosting package, database credentials, signing private key and settlement key out of client distributions. Back up the database and server keys together; do not generate replacement signing keys casually for an existing client fleet.
 
