@@ -1,0 +1,9 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule ^(?:app|config|storage|tools|patches)(?:/|$) - [F,L,NC]
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteRule ^api/(.*)$ api.php?route=$1 [QSA,L]
+<FilesMatch "\.(?:sql|pem|key|log|ini|sqlite|md|zip)$">
+  Require all denied
+</FilesMatch>
