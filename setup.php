@@ -10,6 +10,7 @@ try{
         $authorizedSetup=true;
     }
     Asut\Installer::preflight($cfg);$installed=(new Asut\Db($cfg))->installed();
+    if($installed)Asut\Installer::migrate(new Asut\Db($cfg));
     if($_SERVER['REQUEST_METHOD']==='POST'&&!$installed){
         Asut\Installer::install($cfg,trim((string)($_POST['username']??'')),(string)($_POST['password']??''));$installed=true;
     }

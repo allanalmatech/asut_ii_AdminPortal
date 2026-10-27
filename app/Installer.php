@@ -37,13 +37,19 @@ final class Installer {
             $sql=str_replace('{{prefix}}',$db->prefix,file_get_contents(dirname(__DIR__).'/schema.sql'));
             foreach(explode(';',$sql)as$statement)if(trim($statement)!=='')$db->pdo->exec($statement);
             (new Store($db,$keys))->seed($name,$password,$demo);
+            self::migrate($db);
             return $keys;
         }finally{flock($guard,LOCK_UN);fclose($guard);}
     }
     public static function migrate(Db $db): void {
+        $version=$db->one("SELECT setting_value FROM {settings} WHERE setting_key='schema_version'");
+        if((int)($version['setting_value']??0)>=3)return;
+        $lock='ASUTII:'.substr(hash('sha256',$db->config['db_name'].'/'.$db->prefix),0,40);
+        V::need((int)$db->query('SELECT GET_LOCK(?,10)',[$lock])->fetchColumn()===1,503,'migration_busy','Database upgrade is in progress. Retry shortly.');
+        try {
         $exists=$db->one('SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?',[$db->prefix.'ledger','voucher_id']);
-        if($exists)return;
         $sql=str_replace('{{prefix}}',$db->prefix,file_get_contents(dirname(__DIR__).'/schema.sql'));
+        if(!$exists){
         foreach(explode(';',$sql)as$s)if(str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'vouchers'))$db->pdo->exec($s);
         // MySQL DDL is maintenance, not part of a live financial transaction.
         // Upgrade the initial local prototype's ledger before serving requests.
@@ -51,5 +57,9 @@ final class Installer {
         foreach($db->all("SELECT CONSTRAINT_NAME,CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME=?",[$db->prefix.'ledger'])as$c)
             if(str_contains($c['CHECK_CLAUSE'],'RESERVE'))$db->pdo->exec('ALTER TABLE `'.$db->prefix.'ledger` DROP CONSTRAINT `'.str_replace('`','``',$c['CONSTRAINT_NAME']).'`');
         $db->query("ALTER TABLE {ledger} ADD CHECK((kind='RESERVE' AND delta<0) OR(kind IN('TOPUP','REFUND','VOUCHER') AND delta>0) OR kind='ADJUSTMENT')");
+        }
+        foreach(explode(';',$sql)as$s)if(str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notifications')||str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notification_reads'))$db->pdo->exec($s);
+        $db->query("INSERT INTO {settings}(setting_key,setting_value) VALUES('schema_version','3') ON DUPLICATE KEY UPDATE setting_value='3'");
+        } finally {$db->query('SELECT RELEASE_LOCK(?)',[$lock]);}
     }
 }

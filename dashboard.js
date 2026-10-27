@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const portalRoot = new URL(".", document.currentScript.src);
 let csrf = "", state = null, page = "overview", adjustmentClient = null, refundOperation = null;
-const titles = {overview:"Overview", clients:"Clients & hardware", tariffs:"Device tariffs", vouchers:"Credit vouchers", operations:"Unlock operations", ledger:"Unit ledger & audit"};
+const titles = {overview:"Overview", clients:"Clients & hardware", tariffs:"Device tariffs", vouchers:"Credit vouchers", updates:"App updates", notifications:"Notifications", operations:"Unlock operations", ledger:"Unit ledger & audit"};
 const fmt = (value) => Number(value).toLocaleString();
 const when = (value) => value ? new Date(Number(value)*1000).toLocaleString() : "—";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (x) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
@@ -20,7 +20,7 @@ function render() {
   const s=state.summary;
   $("stats").innerHTML=[["Client accounts",s.clients,`${fmt(s.activeClients)} active accounts`],["Available client units",s.availableUnits,"Combined current balances"],["Consumed units",s.consumedUnits,"Completed, non-refunded unlocks"],["Reserved units",s.reservedUnits,"Authorized or executing operations"]].map(([name,value,note])=>`<article class="stat"><small>${esc(name)}</small><strong>${fmt(value)}</strong><span>${esc(note)}</span></article>`).join("");
   $("recent-operations").innerHTML=state.operations.slice(0,6).map(o=>`<div class="operation-mini"><div><b>${esc(o.device_name)}</b><small>${esc(o.username)} · ${esc(when(o.created_at))}</small></div><div>${badge(o.state)}<small>${fmt(o.cost)} units</small></div></div>`).join("") || '<div class="empty">Unlock activity will appear here.</div>';
-  renderClients(); renderTariffs(); renderOperations(); renderVouchers();
+  renderClients(); renderTariffs(); renderOperations(); renderVouchers(); renderClientControl();
   $("ledger-body").innerHTML=state.ledger.map(l=>`<tr><td>${esc(when(l.created_at))}</td><td>${esc(l.username)}</td><td>${badge(l.kind.toLowerCase())}</td><td class="${l.delta>0?"positive":"negative"}">${l.delta>0?"+":""}${fmt(l.delta)}</td><td>${fmt(l.balance_after)}</td><td class="reason-cell">${esc(l.reason)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No unit transactions.</td></tr>';
   $("audit-list").innerHTML=state.audit.map(a=>`<div class="audit-entry"><time>${esc(when(a.created_at))}</time><div><b>${esc(a.action.replaceAll("_"," "))}</b><span class="muted">${esc(a.actor)} · ${esc(a.message)}</span></div></div>`).join("") || '<p class="muted">No administrative activity.</p>';
 }
@@ -36,6 +36,18 @@ function renderOperations() {
 }
 function renderVouchers(){
   $("vouchers-body").innerHTML=(state.vouchers||[]).map(v=>`<tr><td class="monospace">${esc(v.code_hint)}<small>${esc(when(v.created_at))}</small></td><td>${fmt(v.units)}</td><td class="monospace" title="${esc(v.hwid||'')}">${v.hwid?esc(v.hwid.slice(0,10)+'…'+v.hwid.slice(-6)):'Any authorized hardware'}</td><td>${badge(v.used_at?'redeemed':!v.active?'disabled':v.expires_at&&Number(v.expires_at)<Date.now()/1000?'expired':'active')}</td><td>${esc(v.used_by||'—')}<small>${v.used_at?esc(when(v.used_at)):''}</small></td><td>${!v.used_at&&v.active?`<button data-disable-voucher="${esc(v.id)}">Disable</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No vouchers created.</td></tr>';
+}
+function renderClientControl(){
+  const policy=state.updatePolicy||{};
+  if(!document.activeElement?.closest('#update-form')){
+    $('update-version').value=policy.version||'';$('update-build').value=policy.buildNumber||'';$('update-url').value=policy.downloadUrl||'';
+    $('update-grace').value=policy.graceHours??24;$('update-notes').value=policy.notes||'';$('update-enabled').checked=!!policy.enabled;
+  }
+  $('update-status').textContent=policy.enabled?`Published ${when(policy.publishedAt)} · Mandatory from ${when(policy.mandatoryAt)}`:'Update enforcement is off.';
+  const selected=$('notification-recipient').value;
+  $('notification-recipient').innerHTML='<option value="">All clients</option>'+state.clients.map(c=>`<option value="${esc(c.id)}">${esc(c.username)} · ${esc(c.displayName)}</option>`).join('');
+  $('notification-recipient').value=selected;
+  $('notifications-body').innerHTML=(state.notifications||[]).map(n=>`<tr><td><b>${esc(n.title)}</b><small class="reason-cell">${esc(n.message)}</small></td><td>${esc(n.recipient_username||'All clients')}</td><td>${esc(when(n.created_at))}<small>${n.expires_at?'Expires '+esc(when(n.expires_at)):''}</small></td><td>${fmt(n.read_count)}</td><td>${Number(n.active)?`<button data-disable-notification="${esc(n.id)}">Withdraw</button>`:badge('disabled')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No notifications sent.</td></tr>';
 }
 function clientPayload(c) { return {username:c.username,displayName:c.displayName,hwid:c.hwid,active:c.active,expiresAt:c.expiresAt,password:""}; }
 function openClient(id=null) {
@@ -66,6 +78,7 @@ document.addEventListener("click",async event=>{
   try {
     if(button.dataset.copyHwid){await navigator.clipboard.writeText(state.clients.find(c=>c.id===button.dataset.copyHwid).hwid);notice("Authorized HWID copied.");}
     if(button.dataset.disableVoucher){button.disabled=true;await api('vouchers/'+button.dataset.disableVoucher+'/disable','POST',{});await refresh();notice('Voucher disabled.');}
+    if(button.dataset.disableNotification){button.disabled=true;await api('notifications/'+button.dataset.disableNotification+'/disable','POST',{});await refresh();notice('Notification withdrawn.');}
     if(button.dataset.toggleClient){button.disabled=true;const c=state.clients.find(x=>x.id===button.dataset.toggleClient);await api("clients/"+c.id,"PUT",{...clientPayload(c),active:!c.active});await refresh();notice(c.active?"Client suspended and sessions revoked.":"Client activated.");}
     if(button.dataset.saveTariff){button.disabled=true;const row=button.closest("tr");await api("devices/"+button.dataset.saveTariff,"PUT",{unitCost:Number(row.querySelector(".tariff-input").value),enabled:row.querySelector(".tariff-enabled").checked});await refresh();notice("Device tariff saved. New unlocks use the server's updated price.");}
   }catch(error){notice(error.message,true);}finally{button.disabled=false;}
@@ -79,3 +92,11 @@ setInterval(()=>{if(csrf && !document.querySelector("dialog[open]"))refresh();},
 $("create-vouchers").addEventListener('click',()=>{$('voucher-form').reset();$('voucher-dialog').showModal();});
 $("voucher-form").addEventListener('submit',event=>{event.preventDefault();submit(event.currentTarget,async()=>{const response=await api('vouchers','POST',{units:Number($('voucher-units').value),quantity:Number($('voucher-quantity').value),hwid:$('voucher-hwid').value.trim(),expiresAt:$('voucher-expiry').value?Math.floor(new Date($('voucher-expiry').value).getTime()/1000):null,notes:$('voucher-notes').value.trim()});$('voucher-dialog').close();$('voucher-codes').value=response.codes.join('\n');$('codes-dialog').showModal();await refresh();});});
 $("copy-voucher-codes").addEventListener('click',async()=>{await navigator.clipboard.writeText($('voucher-codes').value);});
+$('update-form').addEventListener('submit',event=>{event.preventDefault();submit(event.currentTarget,async()=>{
+  await api('update-policy','PUT',{enabled:$('update-enabled').checked,version:$('update-version').value.trim(),buildNumber:Number($('update-build').value),downloadUrl:$('update-url').value.trim(),graceHours:Number($('update-grace').value),notes:$('update-notes').value.trim()});
+  await refresh();notice('Update policy published. The grace period starts now.');
+});});
+$('notification-form').addEventListener('submit',event=>{event.preventDefault();submit(event.currentTarget,async()=>{
+  await api('notifications','POST',{recipientId:$('notification-recipient').value||null,title:$('notification-title').value.trim(),message:$('notification-message').value.trim(),expiresAt:$('notification-expiry').value?Math.floor(new Date($('notification-expiry').value).getTime()/1000):null});
+  $('notification-form').reset();await refresh();notice('Notification sent.');
+});});

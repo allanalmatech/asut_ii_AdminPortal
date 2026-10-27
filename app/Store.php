@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Asut;
 
 final class Store {
-    use AdminMethods, VoucherMethods, PatchMethods;
+    use AdminMethods, VoucherMethods, PatchMethods, ClientControlMethods;
     public function __construct(public Db $db,public Keys $keys) {}
     private function audit(string $actor,string $action,string $target,string $message): void {
         $this->db->query('INSERT INTO {audit}(id,actor,action,target,message,created_at) VALUES(?,?,?,?,?,?)',[Security::id(),$actor,$action,$target,$message,time()]);
@@ -40,7 +40,7 @@ final class Store {
     }
     private function publicClient(array $u): array { return ['id'=>$u['id'],'username'=>$u['username'],'displayName'=>$u['display_name'],'hwid'=>$u['hwid'],'active'=>(bool)$u['active'],'units'=>(int)$u['units'],'expiresAt'=>$u['expires_at']===null?null:(int)$u['expires_at'],'createdAt'=>(int)$u['created_at'],'updatedAt'=>(int)$u['updated_at']]; }
     private function publicDevice(array $d): array { return ['id'=>$d['id'],'name'=>$d['name'],'family'=>$d['family'],'image'=>$d['image'],'available'=>(bool)$d['available'],'enabled'=>(bool)$d['enabled'],'unitCost'=>(int)$d['unit_cost'],'notes'=>$d['notes']]; }
-    private function account(array $u): array { return ['user'=>$this->publicClient($u),'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} ORDER BY sort_order')),'serverTime'=>time()]; }
+    private function account(array $u): array { return ['user'=>$this->publicClient($u),'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} ORDER BY sort_order')),'update'=>$this->updateState(),'notifications'=>$this->notificationsFor($u['id']),'serverTime'=>time()]; }
     private function clientSession(string $token,string $hwid): array {
         V::need(strlen($token)>=32&&strlen($token)<=256,401,'login_required','Please log in.');$hwid=V::hwid($hwid);$hash=Security::tokenHash($token);
         $s=$this->db->one("SELECT owner_id FROM {sessions} WHERE token_hash=? AND role='client' AND expires_at>?",[$hash,time()]);
@@ -74,6 +74,7 @@ final class Store {
     public function clientLogout(string $token,string $hwid): array { return $this->db->tx(function()use($token,$hwid){$this->clientSession($token,$hwid);$this->db->query('DELETE FROM {sessions} WHERE token_hash=?',[Security::tokenHash($token)]);return ['success'=>true];}); }
     private function receipt(array $o): array {return ['operationId'=>$o['id'],'userId'=>$o['user_id'],'deviceId'=>$o['device_id'],'state'=>$o['state'],'unitsCharged'=>(int)$o['cost'],'unitsBalance'=>(int)$this->db->one('SELECT units FROM {clients} WHERE id=?',[$o['user_id']])['units'],'authorizedUntil'=>(int)$o['authorized_until'],'completionToken'=>$this->keys->completion($o)];}
     public function authorize(string $token,string $hwid,array $a): array {return $this->db->tx(function()use($token,$hwid,$a){
+        $this->requireCurrentClient();
         $u=$this->clientSession($token,$hwid);$request=V::uuid(V::text($a,'requestId',64));$device=V::text($a,'deviceId',32);$gateway=V::gateway(V::text($a,'gateway',45));
         $o=$this->db->one('SELECT * FROM {operations} WHERE user_id=? AND request_id=? FOR UPDATE',[$u['id'],$request]);
         if($o){V::need($o['device_id']===$device&&$o['gateway']===$gateway,409,'idempotency_conflict','The request ID was used for different operation details.');V::need($o['state']==='authorized',409,'operation_already_used','This operation already started or was settled.');return ['success'=>true,'receipt'=>$this->receipt($o)];}
@@ -85,6 +86,7 @@ final class Store {
         return ['success'=>true,'receipt'=>$this->receipt($this->db->one('SELECT * FROM {operations} WHERE id=?',[$id]))];
     });}
     public function start(string $token,string $hwid,string $id,array $a): array {return $this->db->tx(function()use($token,$hwid,$id,$a){
+        $this->requireCurrentClient();
         $u=$this->clientSession($token,$hwid);$id=V::uuid($id);$nonce=V::uuid(V::text($a,'nonce',64));
         $o=$this->db->one('SELECT * FROM {operations} WHERE id=? AND user_id=? FOR UPDATE',[$id,$u['id']]);V::need($o!==null,404,'operation_missing','Operation not found.');
         $d=$this->db->one('SELECT * FROM {devices} WHERE id=? FOR UPDATE',[$o['device_id']]);V::need((bool)$d['available']&&(bool)$d['enabled'],403,'device_disabled','This device was disabled.');

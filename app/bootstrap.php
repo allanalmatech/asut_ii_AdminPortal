@@ -9,6 +9,7 @@ require_once __DIR__ . '/Core.php';
 require_once __DIR__ . '/AdminStore.php';
 require_once __DIR__ . '/Vouchers.php';
 require_once __DIR__ . '/Patches.php';
+require_once __DIR__ . '/ClientControl.php';
 require_once __DIR__ . '/Store.php';
 require_once __DIR__ . '/Installer.php';
 

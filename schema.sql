@@ -88,3 +88,20 @@ CREATE TABLE IF NOT EXISTS {{prefix}}auth_limits (
  bucket CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
  window_start BIGINT UNSIGNED NOT NULL, attempts INT UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS {{prefix}}notifications (
+ id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+ recipient_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NULL,
+ title VARCHAR(160) NOT NULL, message TEXT NOT NULL,
+ created_by CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ created_at BIGINT UNSIGNED NOT NULL, expires_at BIGINT UNSIGNED NULL,
+ active TINYINT UNSIGNED NOT NULL DEFAULT 1 CHECK(active IN(0,1)),
+ INDEX idx_notification_recipient(recipient_id,active,created_at),
+ FOREIGN KEY(recipient_id) REFERENCES {{prefix}}clients(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS {{prefix}}notification_reads (
+ notification_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ user_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ read_at BIGINT UNSIGNED NOT NULL, PRIMARY KEY(notification_id,user_id),
+ FOREIGN KEY(notification_id) REFERENCES {{prefix}}notifications(id),
+ FOREIGN KEY(user_id) REFERENCES {{prefix}}clients(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

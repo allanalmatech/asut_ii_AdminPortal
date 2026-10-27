@@ -63,3 +63,23 @@ Use **Clients & hardware** to suspend, activate, rebind hardware, reset password
 Use **Credit vouchers** to generate codes, optionally binding them to an HWID. Save the complete codes when shown. Redeemed vouchers cannot credit another account or be reloaded, and only masked references are retained by the portal.
 
 Use **Unlock operations** and **Unit ledger & audit** to review charges, automatic refunds and interrupted jobs. Administrator refunds are operation-scoped and cannot create repeated credits for the same job.
+
+## Client updates and notifications (2.1)
+
+The first API request after deployment applies the non-destructive schema upgrade
+for notifications/read receipts. It retains existing clients, balances, tariffs,
+ledger entries and signing keys. The configured database user needs CREATE/ALTER
+privileges for application schema upgrades, as during initial setup.
+
+In **App updates**, enter the latest software version, numeric build number,
+HTTPS download link and grace period in hours. Publishing starts that grace
+period immediately; zero hours makes the newer build mandatory immediately.
+Older clients are blocked from starting new device operations after the deadline.
+Existing operation settlement/refunds continue to work. Disable enforcement to
+withdraw the policy. The app opens the administrator's download link in the
+user's browser.
+
+In **Notifications**, select one client or **All clients**, enter the title and
+message, and optionally set an expiry. Online clients receive notices on their
+next account check (normally within 30 seconds) or when refreshing. Read receipts
+are per client; withdrawing a notice removes it from subsequent deliveries.

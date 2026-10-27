@@ -6,15 +6,18 @@ Web::headers();
 try {
     $cfg=Asut\configuration();$db=new Db($cfg);
     if(!$db->installed())throw new ApiError(503,'setup_required','Run setup.php before using the portal.');
+    Asut\Installer::migrate($db);
     $store=new Store($db,new Keys(rtrim($cfg['storage_path'],'/\\').'/keys'));
     $route=trim((string)($_GET['route']??''),'/');$method=$_SERVER['REQUEST_METHOD'];
     if(str_starts_with($route,'admin/')&&$method!=='GET')Web::origin();
     $bearer=Web::bearer();$hwid=$_SERVER['HTTP_X_ASUT_HWID']??'';$admin=$_COOKIE['ASUT_ADMIN']??'';$csrf=$_SERVER['HTTP_X_CSRF_TOKEN']??'';
-    if($route==='health'&&$method==='GET')Web::json(['success'=>true,'service'=>'ASUT II Control Center','version'=>'2.0.0','database'=>'MySQL/MariaDB InnoDB','billing'=>'ACID / idempotent operations']);
+    if($route==='health'&&$method==='GET')Web::json(['success'=>true,'service'=>'ASUT II Control Center','version'=>'2.1.0','database'=>'MySQL/MariaDB InnoDB','billing'=>'ACID / idempotent operations']);
+    if($route==='client/release'&&$method==='GET')Web::json($store->clientRelease());
     if($route==='client/login'&&$method==='POST')Web::json($store->clientLogin(Web::body()));
     if($route==='client/account'&&$method==='GET')Web::json($store->clientAccount($bearer,$hwid));
     if($route==='client/logout'&&$method==='POST')Web::json($store->clientLogout($bearer,$hwid));
     if($route==='client/vouchers/redeem'&&$method==='POST')Web::json($store->redeem($bearer,$hwid,Web::body()));
+    if($route==='client/notifications/read'&&$method==='POST')Web::json($store->readNotifications($bearer,$hwid,Web::body()));
     if(preg_match('~^client/unlocks/([a-fA-F0-9-]+)/(patch-info|patch)$~D',$route,$m)&&$method==='GET'){
         $patch=$store->patch($bearer,$hwid,$m[1]);
         if($m[2]==='patch-info'){unset($patch['file']);Web::json($patch);}
@@ -30,6 +33,9 @@ try {
     if($route==='admin/logout'&&$method==='POST'){$result=$store->adminLogout($admin,$csrf);Web::adminCookie('',time()-3600);Web::json($result);}
     if($route==='admin/clients'&&$method==='POST')Web::json($store->saveClient($admin,$csrf,null,Web::body()));
     if($route==='admin/vouchers'&&$method==='POST')Web::json($store->createVouchers($admin,$csrf,Web::body()));
+    if($route==='admin/update-policy'&&$method==='PUT')Web::json($store->publishUpdate($admin,$csrf,Web::body()));
+    if($route==='admin/notifications'&&$method==='POST')Web::json($store->sendNotification($admin,$csrf,Web::body()));
+    if(preg_match('~^admin/notifications/([a-fA-F0-9-]+)/disable$~D',$route,$m)&&$method==='POST')Web::json($store->disableNotification($admin,$csrf,$m[1]));
     if(preg_match('~^admin/vouchers/([a-fA-F0-9-]+)/disable$~D',$route,$m)&&$method==='POST')Web::json($store->disableVoucher($admin,$csrf,$m[1]));
     if(preg_match('~^admin/clients/([a-fA-F0-9-]+)$~D',$route,$m)&&$method==='PUT')Web::json($store->saveClient($admin,$csrf,$m[1],Web::body()));
     if(preg_match('~^admin/clients/([a-fA-F0-9-]+)/units$~D',$route,$m)&&$method==='POST')Web::json($store->adjustUnits($admin,$csrf,$m[1],Web::body()));

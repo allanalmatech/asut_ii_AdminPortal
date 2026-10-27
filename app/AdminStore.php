@@ -37,7 +37,8 @@ trait AdminMethods {
                 'operations'=>$this->db->all('SELECT o.*,c.username,d.name AS device_name FROM {operations} o JOIN {clients} c ON c.id=o.user_id JOIN {devices} d ON d.id=o.device_id ORDER BY o.created_at DESC,o.id DESC LIMIT 200'),
                 'ledger'=>$this->db->all('SELECT l.seq,l.user_id,c.username,l.kind,l.delta,l.balance_after,l.reason,l.created_at,l.operation_id FROM {ledger} l JOIN {clients} c ON c.id=l.user_id ORDER BY l.seq DESC LIMIT 200'),
                 'audit'=>$this->db->all('SELECT * FROM {audit} ORDER BY seq DESC LIMIT 100'),
-                'vouchers'=>$this->db->all('SELECT v.id,v.code_hint,v.units,v.hwid,v.active,v.expires_at,v.used_at,v.created_at,v.notes,c.username AS used_by FROM {vouchers} v LEFT JOIN {clients} c ON c.id=v.used_by ORDER BY v.created_at DESC,v.id LIMIT 500'),'serverTime'=>time()];
+                'vouchers'=>$this->db->all('SELECT v.id,v.code_hint,v.units,v.hwid,v.active,v.expires_at,v.used_at,v.created_at,v.notes,c.username AS used_by FROM {vouchers} v LEFT JOIN {clients} c ON c.id=v.used_by ORDER BY v.created_at DESC,v.id LIMIT 500'),
+                'updatePolicy'=>$this->updatePolicy(),'notifications'=>$this->adminNotifications(),'serverTime'=>time()];
         });
     }
     public function saveClient(string $token,string $csrf,?string $id,array $a): array {return $this->db->tx(function()use($token,$csrf,$id,$a){

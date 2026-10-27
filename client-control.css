@@ -1,0 +1,5 @@
+select,textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid #d8e1ee;border-radius:8px;background:white;color:var(--ink)}
+select:focus,textarea:focus{outline:2px solid #bdd3ff;border-color:var(--blue)}
+[data-section="updates"] form,[data-section="notifications"] form{max-width:760px}
+[data-section="notifications"] .table-panel{margin-top:22px}
+#notifications-body small{white-space:pre-wrap;max-width:560px}
