@@ -3,7 +3,7 @@
 ## Requirements
 
 - PHP 8.0+ (PHP 8.2+ recommended), PDO MySQL, OpenSSL and JSON.
-- MySQL **8.0.16+** or MariaDB **10.4+**, with InnoDB tables and `innodb_flush_log_at_trx_commit=1`.
+- MySQL **8.0.16+** or MariaDB **10.3+**, including **10.3.39-MariaDB-cll-lve**, with InnoDB tables and `innodb_flush_log_at_trx_commit=1`.
 - Apache/LiteSpeed-compatible `.htaccess`, URL rewriting and authorization headers.
 - A valid HTTPS certificate for the public client API.
 
@@ -13,9 +13,17 @@
 2. Upload and extract `ASUT-II-Admin-Portal.zip` in a private hosting directory outside `public_html`, then move its extracted contents into, for example, `public_html/asut-admin/`. `index.php`, `api.php`, `.htaccess`, `assets`, `patches`, `app`, `config` and `storage` must be at the same level. Include hidden `.htaccess` files. Keep the owner-only archive outside the public web directory; the supplied root rules also deny direct ZIP downloads.
 3. Copy `config/config.example.php` to `config/local.php`. Enter the database host, port, name, user and password. Replace `setup_token` with a new random secret of at least 24 characters. Keep this configuration private.
 4. Keep the supplied `storage/keys` files: they match the client build's public key. If using a storage path outside `public_html` (preferred when available), move the complete storage folder, including these keys, and set `storage_path` accordingly. Give PHP write permission to that private storage folder.
-5. Open `https://your-domain.example/asut-admin/setup.php`. Enter the configured setup key and choose the administrator credentials. Installation creates the tables and catalog atomically seeds the admin account. An installed portal cannot be reinitialized to replace its administrator.
+5. Open `https://almatechconsults.com/asut_admin/setup.php` (or your own portal's setup URL). Enter the configured setup key and choose the administrator credentials. Installation creates the tables and catalog atomically seeds the admin account. An installed portal cannot be reinitialized to replace its administrator.
 6. Sign in at the portal root. Configure tariffs, enable the implemented devices you want to offer, and create active clients with their authorized HWIDs. Hosted installation does not create demonstration client accounts or enable arbitrary prices for you.
-7. Before building the client, set the source `ManagedSystem/ClientAssets/client-config.json` field `apiBaseUrl` to `https://your-domain.example/asut-admin/`. Rebuild/distribute the updated client. The URL is not displayed or editable in the login form. The client validates the matching server public key and requires a reachable API before unlocking.
+7. The client source `App Source Code/ManagedSystem/ClientAssets/client-config.json` field `apiBaseUrl` is configured for `https://almatechconsults.com/asut_admin/`. Rebuild/distribute the updated client when changing the host. The URL is not displayed or editable in the login form. The client validates the matching server public key and requires a reachable API before unlocking.
+
+### Git updates on this host
+
+Pull the portal repository to update PHP, setup and schema code. Keep the host's
+existing `config/local.php` and `storage/keys`. The repository excludes local
+configuration, keys, binary assets and patch ZIPs; install those from the full
+hosting ZIP for a first deployment. When this compatibility update is pulled,
+reload `setup.php` and run installation with the configured setup key.
 
 The Windows client folder contains only the server's public key. Keep the administrator hosting package, database credentials, signing private key and settlement key out of client distributions. Back up the database and server keys together; do not generate replacement signing keys casually for an existing client fleet.
 

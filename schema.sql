@@ -1,4 +1,5 @@
--- MySQL 8.0.16+ or MariaDB 10.4+. Every application table uses InnoDB.
+-- MySQL 8.0.16+ or MariaDB 10.3+ (including 10.3.39-MariaDB-cll-lve).
+-- All tables use InnoDB and CHECK constraints are enforced on these versions.
 -- {{prefix}} is replaced by the validated configured table prefix at setup.
 CREATE TABLE IF NOT EXISTS {{prefix}}settings (
  setting_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,

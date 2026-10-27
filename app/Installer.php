@@ -3,14 +3,21 @@ declare(strict_types=1);
 namespace Asut;
 
 final class Installer {
+    public static function requireDatabaseVersion(string $raw): void {
+        $maria=stripos($raw,'MariaDB')!==false;$version='';
+        // Some hosts advertise the MySQL protocol prefix 5.5.5 before the
+        // actual MariaDB version, e.g. 5.5.5-10.3.39-MariaDB-cll-lve.
+        if($maria&&preg_match('/(?:^|[-\s])(\d+\.\d+\.\d+)(?=-MariaDB\b)/i',$raw,$match))$version=$match[1];
+        elseif(preg_match('/\d+\.\d+\.\d+/',$raw,$match))$version=$match[0];
+        V::need($version!==''&&version_compare($version,$maria?'10.3.0':'8.0.16','>='),500,'database_version','Use MariaDB 10.3+ (including 10.3.39-MariaDB-cll-lve) or MySQL 8.0.16+.');
+    }
     public static function install(array $cfg,string $name,string $password,?array $demo=null): Keys {
         $db=new Db($cfg);$storage=rtrim($cfg['storage_path'],'/\\');
         if(!is_dir($storage)&&!mkdir($storage,0700,true))throw new \RuntimeException('Cannot create private storage.');
         $guard=fopen($storage.'/setup.guard','c+');if(!$guard||!flock($guard,LOCK_EX))throw new \RuntimeException('Cannot lock installation.');
         try{
             $keys=new Keys($storage.'/keys',true);if($db->installed()){self::migrate($db);return $keys;}
-            $version=$db->pdo->query('SELECT VERSION()')->fetchColumn();preg_match('/[0-9]+\.[0-9]+\.[0-9]+/',$version,$v);
-            V::need(version_compare($v[0],str_contains($version,'MariaDB')?'10.4.0':'8.0.16','>='),500,'database_version','Use MySQL 8.0.16+ or MariaDB 10.4+.');
+            self::requireDatabaseVersion((string)$db->pdo->query('SELECT VERSION()')->fetchColumn());
             // MySQL DDL implicitly commits: schema installation is deliberately
             // separate from the atomic account/billing transactions.
             $sql=str_replace('{{prefix}}',$db->prefix,file_get_contents(dirname(__DIR__).'/schema.sql'));
