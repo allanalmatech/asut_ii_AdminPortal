@@ -58,7 +58,7 @@ function openClient(id=null) {
   $("client-dialog").showModal();
 }
 async function submit(form, work) {
-  const button=form.querySelector('button[type="submit"]'); button.disabled=true;
+  const button=form.querySelector('button[type="submit"],button[data-submit]'); button.disabled=true;
   form.querySelector(".dialog-error")?.remove();
   try { await work(); } catch(error) { const message=document.createElement("p"); message.className="dialog-error"; message.setAttribute("role","alert"); message.textContent=error.message; form.append(message); } finally { button.disabled=false; }
 }
@@ -69,6 +69,7 @@ $("refund-form").addEventListener("submit",event=>{event.preventDefault();submit
 $("password-form").addEventListener("submit",event=>{event.preventDefault();const form=event.currentTarget;submit(form,async()=>{await api("password","POST",{currentPassword:$("old-password").value,newPassword:$("new-password").value});form.reset();showLogin();$("login-error").textContent="Password changed. Sign in with the new password.";});});
 document.addEventListener("click",async event=>{
   const button=event.target.closest("button"); if(!button) return;
+  if(button.closest('form')&&(button.type==='submit'||button.hasAttribute('data-submit')))return;
   if(button.hasAttribute("data-close")){button.closest("dialog").close();return;}
   if(button.dataset.page){navigate(button.dataset.page);return;}
   if(button.hasAttribute("data-create-client")){openClient();return;}
@@ -100,3 +101,4 @@ $('notification-form').addEventListener('submit',event=>{event.preventDefault();
   await api('notifications','POST',{recipientId:$('notification-recipient').value||null,title:$('notification-title').value.trim(),message:$('notification-message').value.trim(),expiresAt:$('notification-expiry').value?Math.floor(new Date($('notification-expiry').value).getTime()/1000):null});
   $('notification-form').reset();await refresh();notice('Notification sent.');
 });});
+$('send-notification').addEventListener('click',event=>{event.preventDefault();$('notification-form').requestSubmit();});
