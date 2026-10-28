@@ -141,26 +141,6 @@
       "image": "devices/X28.png",
       "available": true,
       "notes": "Firmware must be below 4.0.1. Insert the operator SIM and wait for a valid cell ID. Only device information is backed up for this configuration-reset routine."
-    },
-    {
-      "id": "MF286",
-      "deviceId": "MF286",
-      "name": "ZTE MF286",
-      "family": "Reference model \u00B7 Routine unavailable",
-      "defaultGateway": "192.168.0.1",
-      "image": "devices/MF286.png",
-      "available": false,
-      "notes": "The original tool includes this model as a reference but contains no unlock routine. Its reference image remains available in the preview."
-    },
-    {
-      "id": "TR109",
-      "deviceId": "TR109",
-      "name": "TECNO TR109",
-      "family": "Reference model \u00B7 Routine unavailable",
-      "defaultGateway": "192.168.0.1",
-      "image": "devices/TR109.png",
-      "available": false,
-      "notes": "The original tool includes this model as a reference but contains no unlock routine. Its reference image remains available in the preview."
     }
   ]
 }

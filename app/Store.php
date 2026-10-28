@@ -40,7 +40,7 @@ final class Store {
     }
     private function publicClient(array $u): array { return ['id'=>$u['id'],'username'=>$u['username'],'displayName'=>$u['display_name'],'hwid'=>$u['hwid'],'active'=>(bool)$u['active'],'units'=>(int)$u['units'],'expiresAt'=>$u['expires_at']===null?null:(int)$u['expires_at'],'createdAt'=>(int)$u['created_at'],'updatedAt'=>(int)$u['updated_at']]; }
     private function publicDevice(array $d): array { return ['id'=>$d['id'],'name'=>$d['name'],'family'=>$d['family'],'image'=>$d['image'],'available'=>(bool)$d['available'],'enabled'=>(bool)$d['enabled'],'unitCost'=>(int)$d['unit_cost'],'notes'=>$d['notes']]; }
-    private function account(array $u): array { return ['user'=>$this->publicClient($u),'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} ORDER BY sort_order')),'update'=>$this->updateState(),'notifications'=>$this->notificationsFor($u['id']),'serverTime'=>time()]; }
+    private function account(array $u): array { return ['user'=>$this->publicClient($u),'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} WHERE available=1 ORDER BY sort_order')),'update'=>$this->updateState(),'notifications'=>$this->notificationsFor($u['id']),'serverTime'=>time()]; }
     private function clientSession(string $token,string $hwid): array {
         V::need(strlen($token)>=32&&strlen($token)<=256,401,'login_required','Please log in.');$hwid=V::hwid($hwid);$hash=Security::tokenHash($token);
         $s=$this->db->one("SELECT owner_id FROM {sessions} WHERE token_hash=? AND role='client' AND expires_at>?",[$hash,time()]);

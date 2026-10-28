@@ -33,7 +33,7 @@ trait AdminMethods {
             $summary=$this->db->one("SELECT (SELECT COUNT(*) FROM {clients}) AS clients,(SELECT COUNT(*) FROM {clients} WHERE active=1 AND(expires_at IS NULL OR expires_at>?)) AS activeClients,(SELECT COALESCE(SUM(units),0) FROM {clients}) AS availableUnits,(SELECT COALESCE(SUM(cost),0) FROM {operations} WHERE state='applied') AS consumedUnits,(SELECT COALESCE(SUM(cost),0) FROM {operations} WHERE state IN('authorized','executing')) AS reservedUnits",[time()]);
             return ['success'=>true,'summary'=>array_map('intval',$summary),
                 'clients'=>array_map(fn($u)=>$this->publicClient($u),$this->db->all('SELECT * FROM {clients} ORDER BY created_at DESC,id')),
-                'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} ORDER BY sort_order')),
+                'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} WHERE available=1 ORDER BY sort_order')),
                 'operations'=>$this->db->all('SELECT o.*,c.username,d.name AS device_name FROM {operations} o JOIN {clients} c ON c.id=o.user_id JOIN {devices} d ON d.id=o.device_id ORDER BY o.created_at DESC,o.id DESC LIMIT 200'),
                 'ledger'=>$this->db->all('SELECT l.seq,l.user_id,c.username,l.kind,l.delta,l.balance_after,l.reason,l.created_at,l.operation_id FROM {ledger} l JOIN {clients} c ON c.id=l.user_id ORDER BY l.seq DESC LIMIT 200'),
                 'audit'=>$this->db->all('SELECT * FROM {audit} ORDER BY seq DESC LIMIT 100'),
