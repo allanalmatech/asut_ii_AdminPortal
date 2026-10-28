@@ -4,19 +4,20 @@ require __DIR__ . '/app/bootstrap.php';
 \Asut\Web::headers();
 header('Cache-Control: no-store, max-age=0');
 $dashboardVersion=substr(hash_file('sha256',__DIR__.'/dashboard.js'),0,12);
+$brandVersion=substr(hash_file('sha256',__DIR__.'/assets/ALMA Smart Unlock Logo.png'),0,12);
 ?>
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASUT II · Control Center</title><link rel="icon" type="image/x-icon" href="assets/ALMA%20Smart%20Unlock%20Logo.ico"><link rel="stylesheet" href="dashboard.css?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>"><link rel="stylesheet" href="branding.css"><link rel="stylesheet" href="client-control.css?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>"><script src="dashboard.js?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASUT II · Control Center</title><link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=<?=$brandVersion?>"><link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=<?=$brandVersion?>"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=<?=$brandVersion?>"><link rel="stylesheet" href="dashboard.css?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>"><link rel="stylesheet" href="branding.css?v=<?=$brandVersion?>"><link rel="stylesheet" href="client-control.css?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>"><script src="dashboard.js?v=<?=htmlspecialchars($dashboardVersion,ENT_QUOTES,'UTF-8')?>" defer></script></head>
 <body>
 <section id="login-screen" class="login-screen">
-  <div class="login-card"><img class="brand-mark brand-logo" src="assets/ALMA%20Smart%20Unlock%20Logo.ico" alt="ALMA Smart Unlock logo"><div class="eyebrow">ALMA SMART UNLOCK TOOL</div><h1>Control Center</h1><p class="muted">Manage clients, hardware access and device tariffs.</p>
+  <div class="login-card"><img class="brand-mark brand-logo" src="assets/ALMA%20Smart%20Unlock%20Logo.png?v=<?=$brandVersion?>" alt="ALMA Smart Unlock logo"><div class="eyebrow">ALMA SMART UNLOCK TOOL</div><h1>Control Center</h1><p class="muted">Manage clients, hardware access and device tariffs.</p>
     <form id="login-form"><label>Administrator username<input id="admin-username" name="username" required autocomplete="username" maxlength="64"></label><label>Password<input id="admin-password" name="password" type="password" required autocomplete="current-password" maxlength="256"></label><p id="login-error" class="error" role="alert"></p><button class="primary" type="submit">Sign in to dashboard</button></form>
     <div class="login-footer"><span class="dot"></span>Local API · Transactional unit billing</div>
   </div>
 </section>
 <div id="dashboard" class="shell" hidden>
-  <aside><div class="brand"><img class="brand-mark small brand-logo" src="assets/ALMA%20Smart%20Unlock%20Logo.ico" alt="ALMA Smart Unlock logo"><div><b>ASUT II</b><small>CONTROL CENTER</small></div></div><div class="workspace-label">WORKSPACE</div>
+  <aside><div class="brand"><img class="brand-mark small brand-logo" src="assets/ALMA%20Smart%20Unlock%20Logo.png?v=<?=$brandVersion?>" alt="ALMA Smart Unlock logo"><div><b>ASUT II</b><small>CONTROL CENTER</small></div></div><div class="workspace-label">WORKSPACE</div>
     <nav aria-label="Dashboard sections"><button data-page="overview" class="nav active">Overview</button><button data-page="clients" class="nav">Clients & hardware</button><button data-page="tariffs" class="nav">Device tariffs</button><button data-page="vouchers" class="nav">Credit vouchers</button><button data-page="updates" class="nav">App updates</button><button data-page="notifications" class="nav">Notifications</button><button data-page="operations" class="nav">Unlock operations</button><button data-page="ledger" class="nav">Unit ledger & audit</button></nav>
     <div class="aside-bottom"><span class="pill green">ACID BILLING</span><p>Server-priced operations.<br>Hardware-bound accounts.</p></div>
   </aside>
