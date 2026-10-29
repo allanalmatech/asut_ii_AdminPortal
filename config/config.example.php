@@ -13,4 +13,7 @@ return [
     'storage_path' => dirname(__DIR__) . '/storage',
     'setup_token' => 'replace-with-a-long-random-setup-key-at-least-24-characters',
     'auth_limit' => 30,
+    // Optional private path for download.php. Upload the customer EXE here,
+    // or set its HTTPS download link through Admin → App updates.
+    // 'client_download_file' => dirname(__DIR__).'/storage/releases/ASUT-II-Portable.exe',
 ];

@@ -92,7 +92,8 @@ trait AdminMethods {
         $this->db->tx(function()use($name,$password,$demo,$catalog){
             $setting=$this->db->one("SELECT setting_value FROM {settings} WHERE setting_key='installed' FOR UPDATE");V::need($setting['setting_value']!=='1',409,'already_installed','The portal is already installed.');
             $this->db->query('INSERT INTO {admins}(id,username,password_hash,active,created_at) VALUES(?,?,?,1,?)',[Security::id(),$name,Security::password($password),time()]);
-            foreach($catalog as$i=>$d)$this->db->query('INSERT INTO {devices}(id,name,family,image,notes,available,unit_cost,enabled,sort_order,updated_at) VALUES(?,?,?,?,?,?,1,?,?,?)',[$d['id'],$d['name'],$d['family'],$d['image'],$d['notes'],(int)$d['available'],$demo?(int)$d['available']:0,$i,time()]);
+            $prices=array_column(Product::devices(),null,'id');
+            foreach($catalog as$i=>$d)$this->db->query('INSERT INTO {devices}(id,name,family,image,notes,available,unit_cost,enabled,sort_order,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[$d['id'],$d['name'],$d['family'],$d['image'],$d['notes'],(int)$d['available'],(int)($prices[$d['id']]['units']??1),$demo?(int)$d['available']:0,$i,time()]);
             if($demo){$id=Security::id();$this->db->query("INSERT INTO {clients}(id,username,display_name,password_hash,hwid,active,created_at,updated_at) VALUES(?,'demo-client','Local test client',?,?,1,?,?)",[$id,Security::password($demo['password']),V::hwid($demo['hwid']),time(),time()]);$this->ledger($id,'TOPUP',100,'Initial local test units');}
             $this->audit('setup','PORTAL_INSTALLED','portal','PHP/MySQL InnoDB portal installed');$this->db->query("UPDATE {settings} SET setting_value='1' WHERE setting_key='installed'");
         });
