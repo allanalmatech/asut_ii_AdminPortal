@@ -53,6 +53,16 @@
       "notes": "Uses the bundled USB port helper and local databases. Original configuration files are backed up before replacements."
     },
     {
+      "id": "G5TS",
+      "deviceId": "G5TS",
+      "name": "ZTE G5TS (MTN Uganda)",
+      "family": "5G router \u00B7 Factory-reset-persistent local workflow",
+      "defaultGateway": "192.168.1.1",
+      "image": "devices/G5TS.png",
+      "available": true,
+      "notes": "Verified on G5TSHW_1.0.0 / BD_MTNUGAG5TSV1.0.0B04. Administrator login and the correct USB/LAN adapter are required. Airtel acceptance and ASUT branding survived two web factory resets. Device files and startup configuration are backed up."
+    },
+    {
       "id": "LT511A",
       "deviceId": "LT511A",
       "name": "MTN LT511A",
