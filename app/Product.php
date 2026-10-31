@@ -15,7 +15,7 @@ final class Product {
             ['id'=>'LT200','name'=>'SMILE SM-LT200','brand'=>'SMILE','units'=>2,'price'=>6000,'image'=>'LT300.png'],
             ['id'=>'LT200PLUS','name'=>'SMILE SM-LT200+','brand'=>'SMILE','units'=>2,'price'=>6000,'image'=>'LT300.png'],
             ['id'=>'MF935','name'=>'ZTE MF935','brand'=>'ZTE','units'=>3,'price'=>9000,'image'=>'MF935.png'],
-            ['id'=>'G5TS','name'=>'ZTE G5TS (MTN Uganda)','brand'=>'ZTE','units'=>10,'price'=>30000,'image'=>'G5TS.png'],
+            ['id'=>'G5TS','name'=>'ZTE G5TS','brand'=>'ZTE','units'=>10,'price'=>30000,'image'=>'G5TS.png'],
             ['id'=>'MF920','name'=>'ZTE MF920','brand'=>'ZTE','units'=>3,'price'=>9000,'image'=>'MF920.png'],
             ['id'=>'LT511A','name'=>'MTN LT511A','brand'=>'MTN','units'=>3,'price'=>9000,'image'=>'LT511A.png'],
             ['id'=>'M30PRO','name'=>'ZLT M30PRO','brand'=>'ZLT','units'=>3,'price'=>9000,'image'=>'M30PRO.png'],

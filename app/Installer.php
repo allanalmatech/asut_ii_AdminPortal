@@ -43,7 +43,7 @@ final class Installer {
     }
     public static function migrate(Db $db): void {
         $version=$db->one("SELECT setting_value FROM {settings} WHERE setting_key='schema_version'");
-        if((int)($version['setting_value']??0)>=4)return;
+        if((int)($version['setting_value']??0)>=5)return;
         $lock='ASUTII:'.substr(hash('sha256',$db->config['db_name'].'/'.$db->prefix),0,40);
         V::need((int)$db->query('SELECT GET_LOCK(?,10)',[$lock])->fetchColumn()===1,503,'migration_busy','Database upgrade is in progress. Retry shortly.');
         try {
@@ -61,7 +61,12 @@ final class Installer {
         foreach(explode(';',$sql)as$s)if(str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notifications')||str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notification_reads'))$db->pdo->exec($s);
         $catalog=json_decode(file_get_contents(dirname(__DIR__).'/assets/device_catalog.json'),true,32,JSON_THROW_ON_ERROR)['devices'];
         $matching=array_values(array_filter($catalog,static fn($device)=>$device['id']==='G5TS'));
-        V::need(count($matching)===1&&$matching[0]['available']===true,503,'catalog_upgrade_missing','Restore the G5TS device catalog from the matching release.');
+        if(count($matching)!==1||$matching[0]['available']!==true){
+            // A partial code upload must not prevent existing clients or administrators from signing in.
+            // Leave the catalog version pending so the next complete deployment retries this update.
+            error_log('[ASUT catalog] Waiting for the matching G5TS catalog asset.');
+            return;
+        }
         $device=$matching[0];$price=array_column(Product::devices(),null,'id')['G5TS'];
         $db->tx(function()use($db,$device,$price,$catalog){
             $previous=$db->one("SELECT id FROM {devices} WHERE id='G5TS' FOR UPDATE");
@@ -69,12 +74,12 @@ final class Installer {
                 $db->query('INSERT INTO {devices}(id,name,family,image,notes,available,unit_cost,enabled,sort_order,updated_at) VALUES(?,?,?,?,?,1,?,1,?,?)',[
                     $device['id'],$device['name'],$device['family'],$device['image'],$device['notes'],$price['units'],array_search('G5TS',array_column($catalog,'id'),true),time()]);
                 $db->query('INSERT INTO {audit}(id,actor,action,target,message,created_at) VALUES(?,?,?,?,?,?)',[
-                    Security::id(),'system','DEVICE_ADDED','G5TS','Factory-reset-tested MTN Uganda G5TS; initial tariff 10 credits',time()]);
+                    Security::id(),'system','DEVICE_ADDED','G5TS','ZTE G5TS added; initial tariff 10 credits',time()]);
             }else{
                 $db->query("UPDATE {devices} SET name=?,family=?,image=?,notes=?,available=1,updated_at=? WHERE id='G5TS'",[
                     $device['name'],$device['family'],$device['image'],$device['notes'],time()]);
             }
-            $db->query("INSERT INTO {settings}(setting_key,setting_value) VALUES('schema_version','4') ON DUPLICATE KEY UPDATE setting_value='4'");
+            $db->query("INSERT INTO {settings}(setting_key,setting_value) VALUES('schema_version','5') ON DUPLICATE KEY UPDATE setting_value='5'");
         });
         } finally {$db->query('SELECT RELEASE_LOCK(?)',[$lock]);}
     }

@@ -43,7 +43,7 @@ The Windows client folder contains only the server's public key. Keep the admini
 
 - `/api/health` should identify **ASUT II Control Center** and **MySQL/MariaDB InnoDB**.
 - The root should show the public purchase/pricing page; `admin.php` should show the administrator login and dashboard inside the hosting subdirectory.
-- Check the purchase email link, all 14 device prices and the download/request button on desktop and mobile.
+- Check the purchase email link, all 15 device prices and the download/request button on desktop and mobile.
 - Direct web requests to `config`, `app`, `storage`, `tools` and `patches` must be denied. Patches are delivered only through the authenticated API.
 - Ensure TLS is enabled/forced by the hosting panel. The desktop refuses remote HTTP API URLs.
 
@@ -90,10 +90,22 @@ are per client; withdrawing a notice removes it from subsequent deliveries.
 ## Public product page and pricing
 
 The public offer is **UGX 300,000 with 100 credits included**, at **UGX 3,000 per
-credit**. `app/Product.php` contains the offer constants and all 14 published
+credit**. `app/Product.php` contains the offer constants and all 15 published
 device prices. New installations use its credit costs as initial tariffs;
 changing it does not overwrite an installed portal's tariffs. Update existing
 tariffs in **Device tariffs** when changing published pricing.
+
+### G5TS catalog update
+
+Deploy `app/Installer.php`, `app/Product.php`, `assets/device_catalog.json`,
+`assets/devices/G5TS.png`, and `patches/G5TS.zip` with the matching portal release.
+The first API request applies the non-destructive version-5 catalog update.
+An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
+Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
+requested 10-credit value in **Device tariffs** after deployment.
+
+The corresponding Windows client release is **2.1.3**. The device label and
+customer messages are generic; compatibility validation stays in the engine.
 
 The purchase button opens an email to `asutdev@gmail.com`. After arranging
 payment, the administrator creates/activates the client's HWID-authorized
