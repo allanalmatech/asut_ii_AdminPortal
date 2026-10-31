@@ -6,37 +6,37 @@
       "id": "LT300",
       "deviceId": "LT300",
       "name": "SMILE SM-LT300",
-      "family": "USB ADB \u00B7 Local configuration patch",
+      "family": "USB / LAN",
       "defaultGateway": "192.168.1.1",
       "image": "devices/LT300.png",
       "available": true,
-      "notes": "Uses the bundled USB port helper and local databases. Original configuration files are backed up before replacements."
+      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
     },
     {
       "id": "LT200",
       "deviceId": "LT300",
       "name": "SMILE SM-LT200",
-      "family": "USB ADB \u00B7 Local configuration patch",
+      "family": "USB / LAN",
       "defaultGateway": "192.168.1.1",
       "image": "devices/LT300.png",
       "available": true,
-      "notes": "LT200 uses the shared LT300 / LT200 / LT200\u002B local ADB workflow and the supplied family reference image. Original configuration files are backed up before replacements."
+      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
     },
     {
       "id": "LT200PLUS",
       "deviceId": "LT300",
-      "name": "SMILE SM-LT200\u002B",
-      "family": "USB ADB \u00B7 Local configuration patch",
+      "name": "SMILE SM-LT200+",
+      "family": "USB / LAN",
       "defaultGateway": "192.168.1.1",
       "image": "devices/LT300.png",
       "available": true,
-      "notes": "LT200\u002B uses the shared LT300 / LT200 / LT200\u002B local ADB workflow and the supplied family reference image. Original configuration files are backed up before replacements."
+      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
     },
     {
       "id": "MF935",
       "deviceId": "MF935",
       "name": "ZTE MF935",
-      "family": "USB ADB \u00B7 Firmware matched automatically",
+      "family": "USB ADB · Firmware matched automatically",
       "defaultGateway": "192.168.1.1",
       "image": "devices/MF935.png",
       "available": true,
@@ -46,11 +46,11 @@
       "id": "MF920",
       "deviceId": "MF920",
       "name": "ZTE MF920",
-      "family": "USB ADB \u00B7 Local configuration patch",
+      "family": "USB / LAN",
       "defaultGateway": "192.168.0.1",
       "image": "devices/MF920.png",
       "available": true,
-      "notes": "Uses the bundled USB port helper and local databases. Original configuration files are backed up before replacements."
+      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
     },
     {
       "id": "G5TS",
@@ -66,77 +66,77 @@
       "id": "LT511A",
       "deviceId": "LT511A",
       "name": "MTN LT511A",
-      "family": "USB ADB \u00B7 Local configuration patch",
+      "family": "USB / LAN",
       "defaultGateway": "192.168.0.1",
       "image": "devices/LT511A.png",
       "available": true,
-      "notes": "Uses the bundled USB port helper and local databases. Original configuration files are backed up before replacements."
+      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
     },
     {
       "id": "M30PRO",
       "deviceId": "M30PRO",
       "name": "ZLT M30PRO",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/M30PRO.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "M30SPRO",
       "deviceId": "M30SPRO",
       "name": "ZLT M30SPRO",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/M30SPRO.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "M30S",
       "deviceId": "M30S",
       "name": "ZLT M30S",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/M30S.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "T30",
       "deviceId": "T30",
       "name": "ZLT T30",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/T30.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "S20",
       "deviceId": "S20",
       "name": "ZLT S20",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/S20.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "S25",
       "deviceId": "S25",
       "name": "ZLT S25",
-      "family": "4G router \u00B7 Local login \u002B SCP / SSH",
+      "family": "4G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/S25.png",
       "available": true,
-      "notes": "Sign in to the router when its local login window opens. The bundled scripts set the web administrator password to root. Factory-reset after applying the patch."
+      "notes": "Sign in to the router when the device login window opens. Factory-reset after completing the update."
     },
     {
       "id": "X25",
       "deviceId": "X25",
       "name": "ZLT X25",
-      "family": "5G router \u00B7 Local administrator API",
+      "family": "5G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/X25.png",
       "available": true,
@@ -146,7 +146,7 @@
       "id": "X28",
       "deviceId": "X28",
       "name": "ZLT X28",
-      "family": "5G router \u00B7 Local administrator API",
+      "family": "5G router",
       "defaultGateway": "192.168.0.1",
       "image": "devices/X28.png",
       "available": true,

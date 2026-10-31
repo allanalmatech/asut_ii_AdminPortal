@@ -3,29 +3,29 @@ declare(strict_types=1);
 namespace Asut;
 
 final class Product {
-    public const PURCHASE_PRICE=300000;
+    public const PURCHASE_PRICE=100;
     public const INCLUDED_CREDITS=100;
-    public const CREDIT_PRICE=3000;
-    public const CURRENCY='UGX';
+    public const CURRENCY='USD';
     public const SUPPORT_EMAIL='asutdev@gmail.com';
+    public const G5TS_LOCK_COST=2;
 
     public static function devices(): array {
         return [
-            ['id'=>'LT300','name'=>'SMILE SM-LT300','brand'=>'SMILE','units'=>2,'price'=>6000,'image'=>'LT300.png'],
-            ['id'=>'LT200','name'=>'SMILE SM-LT200','brand'=>'SMILE','units'=>2,'price'=>6000,'image'=>'LT300.png'],
-            ['id'=>'LT200PLUS','name'=>'SMILE SM-LT200+','brand'=>'SMILE','units'=>2,'price'=>6000,'image'=>'LT300.png'],
-            ['id'=>'MF935','name'=>'ZTE MF935','brand'=>'ZTE','units'=>3,'price'=>9000,'image'=>'MF935.png'],
-            ['id'=>'G5TS','name'=>'ZTE G5TS','brand'=>'ZTE','units'=>10,'price'=>30000,'image'=>'G5TS.png'],
-            ['id'=>'MF920','name'=>'ZTE MF920','brand'=>'ZTE','units'=>3,'price'=>9000,'image'=>'MF920.png'],
-            ['id'=>'LT511A','name'=>'MTN LT511A','brand'=>'MTN','units'=>3,'price'=>9000,'image'=>'LT511A.png'],
-            ['id'=>'M30PRO','name'=>'ZLT M30PRO','brand'=>'ZLT','units'=>3,'price'=>9000,'image'=>'M30PRO.png'],
-            ['id'=>'M30SPRO','name'=>'ZLT M30SPRO','brand'=>'ZLT','units'=>3,'price'=>9000,'image'=>'M30SPRO.png'],
-            ['id'=>'M30S','name'=>'ZLT M30S','brand'=>'ZLT','units'=>3,'price'=>9000,'image'=>'M30S.png'],
-            ['id'=>'T30','name'=>'ZLT T30','brand'=>'ZLT','units'=>7,'price'=>21000,'image'=>'T30.png'],
-            ['id'=>'S20','name'=>'ZLT S20','brand'=>'ZLT','units'=>7,'price'=>21000,'image'=>'S20.png'],
-            ['id'=>'S25','name'=>'ZLT S25','brand'=>'ZLT','units'=>8,'price'=>24000,'image'=>'S25.png'],
-            ['id'=>'X25','name'=>'ZLT X25','brand'=>'ZLT','units'=>8,'price'=>24000,'image'=>'X25.png'],
-            ['id'=>'X28','name'=>'ZLT X28','brand'=>'ZLT','units'=>8,'price'=>24000,'image'=>'X28.png'],
+            ['id'=>'LT300','name'=>'SMILE SM-LT300','brand'=>'SMILE','units'=>2,'image'=>'LT300.png'],
+            ['id'=>'LT200','name'=>'SMILE SM-LT200','brand'=>'SMILE','units'=>2,'image'=>'LT300.png'],
+            ['id'=>'LT200PLUS','name'=>'SMILE SM-LT200+','brand'=>'SMILE','units'=>2,'image'=>'LT300.png'],
+            ['id'=>'MF935','name'=>'ZTE MF935','brand'=>'ZTE','units'=>3,'image'=>'MF935.png'],
+            ['id'=>'G5TS','name'=>'ZTE G5TS','brand'=>'ZTE','units'=>10,'image'=>'G5TS.png'],
+            ['id'=>'MF920','name'=>'ZTE MF920','brand'=>'ZTE','units'=>3,'image'=>'MF920.png'],
+            ['id'=>'LT511A','name'=>'MTN LT511A','brand'=>'MTN','units'=>3,'image'=>'LT511A.png'],
+            ['id'=>'M30PRO','name'=>'ZLT M30PRO','brand'=>'ZLT','units'=>3,'image'=>'M30PRO.png'],
+            ['id'=>'M30SPRO','name'=>'ZLT M30SPRO','brand'=>'ZLT','units'=>3,'image'=>'M30SPRO.png'],
+            ['id'=>'M30S','name'=>'ZLT M30S','brand'=>'ZLT','units'=>3,'image'=>'M30S.png'],
+            ['id'=>'T30','name'=>'ZLT T30','brand'=>'ZLT','units'=>7,'image'=>'T30.png'],
+            ['id'=>'S20','name'=>'ZLT S20','brand'=>'ZLT','units'=>7,'image'=>'S20.png'],
+            ['id'=>'S25','name'=>'ZLT S25','brand'=>'ZLT','units'=>8,'image'=>'S25.png'],
+            ['id'=>'X25','name'=>'ZLT X25','brand'=>'ZLT','units'=>8,'image'=>'X25.png'],
+            ['id'=>'X28','name'=>'ZLT X28','brand'=>'ZLT','units'=>8,'image'=>'X28.png'],
         ];
     }
 

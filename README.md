@@ -4,11 +4,13 @@ This folder is the authoritative PHP public website, dashboard and API source.
 
 - `index.php`: public product, purchase and device-pricing page.
 - `landing.css` / `landing.js`: responsive public styling, navigation and device search/filtering.
-- `app/Product.php`: UGX 300,000 purchase offer, 100 included credits and all 14 device prices.
+- `app/Product.php`: $100 USD purchase offer, 100 included credits and all 15 device credit prices.
 - `admin.php`: administrator dashboard and login markup.
 - `dashboard.css` / `branding.css`: interface styling and official logo.
 - `dashboard.js`: interface interactions.
 - `api.php` / `app/`: authentication, accounts, tariffs, vouchers and billing.
+- `app/Records.php`: account-isolated client ledger and paginated administrator lists.
+- `app/Lite.php`: authenticated signed-step orchestration and protected server-resource loading.
 - `setup.php`: web installer; `tools/setup.php`: local CLI setup.
 - `download.php`: administrator-published HTTPS download or private EXE streaming with resume support.
 
@@ -65,3 +67,10 @@ upload the customer EXE to the private storage path
 `releases/ASUT-II-Portable.exe`. `client_download_file` can override this path.
 The large EXE is not part of Git or either PHP ZIP. Without a configured file
 or link, the landing page offers a working email request. See `DEPLOY.md`.
+
+The protected workflow package in `patches/lite-workflows.bin` is encrypted to
+the hosting server's RSA public key. Preserve the existing signing private key
+when pulling this release. Resources are authenticated and unpacked under the
+configured private `storage_path` on first use; the Windows build contains only
+generic transports. No plaintext workflow sources or private keys are stored in
+this repository.

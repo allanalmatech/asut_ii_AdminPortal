@@ -3,3 +3,9 @@ select:focus,textarea:focus{outline:2px solid #bdd3ff;border-color:var(--blue)}
 [data-section="updates"] form,[data-section="notifications"] form{max-width:760px}
 [data-section="notifications"] .table-panel{margin-top:22px}
 #notifications-body small{white-space:pre-wrap;max-width:560px}
+.records-pagination{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:10px 0 24px;color:var(--muted,#64748b);font-size:13px}
+.records-pagination label{display:flex;align-items:center;gap:8px;margin:0}
+.records-pagination select{width:auto;min-width:70px;margin:0;padding:7px 10px}
+.records-pagination .actions{display:flex;gap:8px}
+.records-pagination button:disabled{opacity:.45;cursor:default}
+@media(max-width:650px){.records-pagination{align-items:flex-start}.records-pagination .actions{width:100%;justify-content:flex-end}}

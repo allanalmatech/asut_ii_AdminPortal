@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS {{prefix}}operations (
  user_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  request_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  device_id VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ operation_action ENUM('unlock','lock') NOT NULL DEFAULT 'unlock',
+ execution_mode ENUM('normal','lite') NOT NULL DEFAULT 'normal',
  gateway VARCHAR(45) CHARACTER SET ascii NOT NULL, hwid CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  cost INT UNSIGNED NOT NULL CHECK(cost>0),
  state ENUM('authorized','executing','applied','failed','cancelled','expired','refunded') NOT NULL,
@@ -50,6 +52,11 @@ CREATE TABLE IF NOT EXISTS {{prefix}}operations (
  UNIQUE KEY uq_operation_request(user_id,request_id),
  INDEX idx_operation_user(user_id,created_at), INDEX idx_operation_expiry(state,authorized_until),
  FOREIGN KEY(user_id) REFERENCES {{prefix}}clients(id), FOREIGN KEY(device_id) REFERENCES {{prefix}}devices(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS {{prefix}}lite_jobs (
+ operation_id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+ transcript MEDIUMTEXT NOT NULL, updated_at BIGINT UNSIGNED NOT NULL,
+ FOREIGN KEY(operation_id) REFERENCES {{prefix}}operations(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS {{prefix}}vouchers (
  id CHAR(32) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,

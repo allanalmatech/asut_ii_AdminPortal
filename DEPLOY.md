@@ -89,9 +89,10 @@ are per client; withdrawing a notice removes it from subsequent deliveries.
 
 ## Public product page and pricing
 
-The public offer is **UGX 300,000 with 100 credits included**, at **UGX 3,000 per
-credit**. `app/Product.php` contains the offer constants and all 15 published
-device prices. New installations use its credit costs as initial tariffs;
+The public offer is **$100 USD with 100 credits included**. The public device
+table shows credits only, with no currency-conversion display.
+`app/Product.php` contains the offer constants and all 15 published device
+credit prices. New installations use its credit costs as initial tariffs;
 changing it does not overwrite an installed portal's tariffs. Update existing
 tariffs in **Device tariffs** when changing published pricing.
 
@@ -99,13 +100,35 @@ tariffs in **Device tariffs** when changing published pricing.
 
 Deploy `app/Installer.php`, `app/Product.php`, `assets/device_catalog.json`,
 `assets/devices/G5TS.png`, and `patches/G5TS.zip` with the matching portal release.
-The first API request applies the non-destructive version-5 catalog update.
+The first API request applies the non-destructive version-6 schema update.
 An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
 Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
 requested 10-credit value in **Device tariffs** after deployment.
 
-The corresponding Windows client release is **2.1.3**. The device label and
-customer messages are generic; compatibility validation stays in the engine.
+The corresponding Windows client release is **2.2.0**, build **2026103102**.
+The G5TS Lock Device action costs 2 credits, confirmed before authorization;
+unlocking uses the current administrator-configured tariff. Existing balances,
+accounts, tariff edits and transaction history are preserved.
+
+### Protected workflow deployment
+
+Pull the complete portal release, including `app/Records.php`, `app/Lite.php`,
+`schema.sql` and `patches/lite-workflows.bin`. Keep `config/local.php` and all
+existing private keys. The workflow package is encrypted to the server's existing
+RSA public key and is unpacked into versioned directories beneath the configured
+private `storage_path/workflows` on first authorized use. PHP needs its existing
+OpenSSL support and zlib. No extra worker service is required.
+
+The migration adds action/mode fields and the encrypted workflow-transcript
+table. Client results cannot settle server-orchestrated operations through the
+normal completion endpoint. Interrupted jobs with uncertain hardware outcomes
+retain their reservation for administrator reconciliation; verified failures
+and pre-activation cancellation return credits once. Running jobs retain their
+pinned workflow version across a subsequent resource update.
+
+The separate Windows package uses normal ASUT II branding and the same account,
+credit ledger and themed router-login screen. Install the matching Windows
+executable after pulling the API release.
 
 The purchase button opens an email to `asutdev@gmail.com`. After arranging
 payment, the administrator creates/activates the client's HWID-authorized

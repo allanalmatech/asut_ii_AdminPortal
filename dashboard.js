@@ -7,35 +7,75 @@ const fmt = (value) => Number(value).toLocaleString();
 const when = (value) => value ? new Date(Number(value)*1000).toLocaleString() : "—";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (x) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
 function badge(value) { const color = ["active","applied"].includes(value) ? "green" : ["authorized","executing"].includes(value) ? "orange" : ["inactive","failed"].includes(value) ? "red" : ""; return `<span class="pill ${color}">${esc(value)}</span>`; }
+const recordViews = {};
+const sectionLists = {clients:["clients"],tariffs:["devices"],operations:["operations"],ledger:["ledger","audit"],vouchers:["vouchers"],notifications:["notifications"]};
+const listRoots = {clients:"clients-body",devices:"tariffs-body",operations:"operations-body",ledger:"ledger-body",audit:"audit-list",vouchers:"vouchers-body",notifications:"notifications-body"};
+function rows(kind) { return recordViews[kind]?.records ?? (state?.[kind]||[]).slice(0,25); }
+function findRow(kind,id) { return rows(kind).find(row=>row.id===id) || state[kind].find(row=>row.id===id); }
+function setupPagination() {
+  for(const [kind,root] of Object.entries(listRoots)) {
+    const control=document.createElement("div");control.className="records-pagination";control.dataset.records=kind;
+    control.innerHTML=`<label>Maximum records <select aria-label="Maximum ${kind} records"><option>10</option><option selected>25</option><option>50</option><option>100</option><option>200</option><option value="all">All</option></select></label><span role="status"></span><div class="actions"><button type="button" data-direction="-1">Previous</button><button type="button" data-direction="1">Next</button><button type="button" class="link" data-show-all>Show all</button></div>`;
+    $(root).closest("article").insertAdjacentElement("afterend",control);
+    recordViews[kind]={page:1,pageSize:"25",records:null,pagination:null,serial:0,control};
+    control.querySelector("select").addEventListener("change",event=>changeRecords(kind,1,event.target.value));
+    control.querySelectorAll("[data-direction]").forEach(button=>button.addEventListener("click",()=>changeRecords(kind,recordViews[kind].page+Number(button.dataset.direction))));
+    control.querySelector("[data-show-all]").addEventListener("click",()=>changeRecords(kind,1,"all"));
+  }
+}
+async function loadRecords(kind) {
+  const view=recordViews[kind],serial=++view.serial;
+  const query=new URLSearchParams({page:String(view.page),pageSize:view.pageSize});
+  if(kind==="clients")query.set("search",$("client-search").value.trim());
+  const result=await api("records/"+kind+"?"+query);
+  if(serial!==view.serial || !state)return;
+  view.records=result.records;view.pagination=result.pagination;view.page=result.pagination.page;
+}
+async function loadVisibleRecords() { await Promise.all((sectionLists[page]||[]).map(loadRecords)); }
+async function changeRecords(kind,next,size=null) {
+  const view=recordViews[kind];view.page=Math.max(1,next);if(size)view.pageSize=size;
+  view.control.querySelectorAll("button,select").forEach(button=>button.disabled=true);
+  try { await loadRecords(kind);if(state)render(); } catch(error) { notice(error.message,true); } finally { renderPagination(); }
+}
+function renderPagination() {
+  for(const view of Object.values(recordViews)) {
+    const p=view.pagination,control=view.control;control.querySelector("select").value=view.pageSize;control.querySelector("select").disabled=false;
+    control.querySelector("span").textContent=p?`Page ${p.page} of ${p.pages} · ${fmt(p.total)} records`:"";
+    control.querySelector('[data-direction="-1"]').disabled=!p?.hasPrevious;
+    control.querySelector('[data-direction="1"]').disabled=!p?.hasNext;
+    control.querySelector('[data-show-all]').disabled=view.pageSize==="all";
+  }
+}
 function notice(message, bad=false) { $("notice").textContent=message; $("notice").classList.toggle("bad",bad); $("notice").hidden=false; }
-function showLogin() { csrf=""; state=null; $("voucher-codes").value=""; $("dashboard").hidden=true; $("login-screen").hidden=false; document.querySelectorAll("dialog[open]").forEach(x=>x.close()); }
+function showLogin() { csrf=""; state=null;for(const view of Object.values(recordViews)){view.records=null;view.pagination=null;view.page=1;view.serial++;} $("voucher-codes").value=""; $("dashboard").hidden=true; $("login-screen").hidden=false; document.querySelectorAll("dialog[open]").forEach(x=>x.close()); }
 async function api(path, method="GET", data=null) {
   const headers={"Accept":"application/json"}; if(data!==null) headers["Content-Type"]="application/json"; if(method!=="GET" && csrf) headers["X-CSRF-Token"]=csrf;
   let response; try { response=await fetch(new URL("api/admin/"+path,portalRoot),{method,headers,credentials:"same-origin",body:data===null?undefined:JSON.stringify(data)}); } catch { throw new Error("The API could not be reached. Your unsent changes have been retained."); }
   const result=await response.json(); if(!response.ok || !result.success) { if(response.status===401 && path!=="login") showLogin(); throw new Error(result.message || "The request failed."); } return result;
 }
-async function refresh() { try { state=await api("data"); render(); $("connection-status").textContent="API connected"; $("connection-status").className="pill green"; $("updated-label").textContent="Updated "+new Date().toLocaleTimeString(); } catch(error) { $("connection-status").textContent="API unavailable"; $("connection-status").className="pill orange"; notice(error.message,true); } }
-function navigate(next) { page=next; $("page-title").textContent=titles[next]; document.querySelectorAll("[data-section]").forEach(x=>x.hidden=x.dataset.section!==next); document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.page===next)); }
+async function refresh() { try { state=await api("data");await loadVisibleRecords();if(!state)return; render(); $("connection-status").textContent="API connected"; $("connection-status").className="pill green"; $("updated-label").textContent="Updated "+new Date().toLocaleTimeString(); } catch(error) { $("connection-status").textContent="API unavailable"; $("connection-status").className="pill orange"; notice(error.message,true); } }
+function navigate(next) { page=next; $("page-title").textContent=titles[next]; document.querySelectorAll("[data-section]").forEach(x=>x.hidden=x.dataset.section!==next); document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.page===next));if(state)loadVisibleRecords().then(()=>{if(state)render();}).catch(error=>notice(error.message,true)); }
 function render() {
   const s=state.summary;
   $("stats").innerHTML=[["Client accounts",s.clients,`${fmt(s.activeClients)} active accounts`],["Available client units",s.availableUnits,"Combined current balances"],["Consumed units",s.consumedUnits,"Completed, non-refunded unlocks"],["Reserved units",s.reservedUnits,"Authorized or executing operations"]].map(([name,value,note])=>`<article class="stat"><small>${esc(name)}</small><strong>${fmt(value)}</strong><span>${esc(note)}</span></article>`).join("");
   $("recent-operations").innerHTML=state.operations.slice(0,6).map(o=>`<div class="operation-mini"><div><b>${esc(o.device_name)}</b><small>${esc(o.username)} · ${esc(when(o.created_at))}</small></div><div>${badge(o.state)}<small>${fmt(o.cost)} units</small></div></div>`).join("") || '<div class="empty">Unlock activity will appear here.</div>';
   renderClients(); renderTariffs(); renderOperations(); renderVouchers(); renderClientControl();
-  $("ledger-body").innerHTML=state.ledger.map(l=>`<tr><td>${esc(when(l.created_at))}</td><td>${esc(l.username)}</td><td>${badge(l.kind.toLowerCase())}</td><td class="${l.delta>0?"positive":"negative"}">${l.delta>0?"+":""}${fmt(l.delta)}</td><td>${fmt(l.balance_after)}</td><td class="reason-cell">${esc(l.reason)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No unit transactions.</td></tr>';
-  $("audit-list").innerHTML=state.audit.map(a=>`<div class="audit-entry"><time>${esc(when(a.created_at))}</time><div><b>${esc(a.action.replaceAll("_"," "))}</b><span class="muted">${esc(a.actor)} · ${esc(a.message)}</span></div></div>`).join("") || '<p class="muted">No administrative activity.</p>';
+  $("ledger-body").innerHTML=rows("ledger").map(l=>`<tr><td>${esc(when(l.created_at))}</td><td>${esc(l.username)}</td><td>${badge(l.kind.toLowerCase())}</td><td class="${l.delta>0?"positive":"negative"}">${l.delta>0?"+":""}${fmt(l.delta)}</td><td>${fmt(l.balance_after)}</td><td class="reason-cell">${esc(l.reason)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No unit transactions.</td></tr>';
+  $("audit-list").innerHTML=rows("audit").map(a=>`<div class="audit-entry"><time>${esc(when(a.created_at))}</time><div><b>${esc(a.action.replaceAll("_"," "))}</b><span class="muted">${esc(a.actor)} · ${esc(a.message)}</span></div></div>`).join("") || '<p class="muted">No administrative activity.</p>';
+  renderPagination();
 }
 function renderClients() {
   const query=$("client-search").value.toLowerCase();
-  $("clients-body").innerHTML=state.clients.filter(c=>`${c.username} ${c.displayName} ${c.hwid}`.toLowerCase().includes(query)).map(c=>`<tr><td><b>${esc(c.displayName)}</b><small>${esc(c.username)}</small></td><td>${badge(c.active && (!c.expiresAt || c.expiresAt>Date.now()/1000)?"active":"inactive")}${c.expiresAt?`<small>Until ${esc(when(c.expiresAt))}</small>`:""}</td><td><b>${fmt(c.units)}</b></td><td><span class="monospace" title="${esc(c.hwid)}">${esc(c.hwid.slice(0,10))}…${esc(c.hwid.slice(-6))}</span><br><button data-copy-hwid="${esc(c.id)}" class="link">Copy HWID</button></td><td><div class="actions"><button data-edit-client="${esc(c.id)}">Edit</button><button data-units-client="${esc(c.id)}">Units</button><button data-toggle-client="${esc(c.id)}">${c.active?"Suspend":"Activate"}</button></div></td></tr>`).join("") || '<tr><td colspan="5" class="empty">No matching clients.</td></tr>';
+  $("clients-body").innerHTML=rows("clients").filter(c=>`${c.username} ${c.displayName} ${c.hwid}`.toLowerCase().includes(query)).map(c=>`<tr><td><b>${esc(c.displayName)}</b><small>${esc(c.username)}</small></td><td>${badge(c.active && (!c.expiresAt || c.expiresAt>Date.now()/1000)?"active":"inactive")}${c.expiresAt?`<small>Until ${esc(when(c.expiresAt))}</small>`:""}</td><td><b>${fmt(c.units)}</b></td><td><span class="monospace" title="${esc(c.hwid)}">${esc(c.hwid.slice(0,10))}…${esc(c.hwid.slice(-6))}</span><br><button data-copy-hwid="${esc(c.id)}" class="link">Copy HWID</button></td><td><div class="actions"><button data-edit-client="${esc(c.id)}">Edit</button><button data-units-client="${esc(c.id)}">Units</button><button data-toggle-client="${esc(c.id)}">${c.active?"Suspend":"Activate"}</button></div></td></tr>`).join("") || '<tr><td colspan="5" class="empty">No matching clients.</td></tr>';
 }
 function renderTariffs() {
-  $("tariffs-body").innerHTML=state.devices.map(d=>`<tr data-device-row="${esc(d.id)}"><td><div class="device-cell"><img src="${esc(new URL('assets/'+d.image,portalRoot).href)}" alt=""><div><b>${esc(d.name)}</b><small>${esc(d.id)}</small></div></div></td><td>${esc(d.family)}${!d.available?'<small>Original routine unavailable</small>':""}</td><td><input class="tariff-input" type="number" min="0" max="1000000" step="1" value="${d.unitCost}" aria-label="${esc(d.name)} units" ${!d.available?"disabled":""}></td><td><input class="tariff-enabled" type="checkbox" aria-label="Enable ${esc(d.name)}" ${d.enabled?"checked":""} ${!d.available?"disabled":""}></td><td><button data-save-tariff="${esc(d.id)}" ${!d.available?"disabled":""}>Save</button></td></tr>`).join("");
+  $("tariffs-body").innerHTML=rows("devices").map(d=>`<tr data-device-row="${esc(d.id)}"><td><div class="device-cell"><img src="${esc(new URL('assets/'+d.image,portalRoot).href)}" alt=""><div><b>${esc(d.name)}</b><small>${esc(d.id)}</small></div></div></td><td>${esc(d.family)}${d.lockCost?`<small>Lock: ${fmt(d.lockCost)} credits</small>`:""}${!d.available?'<small>Original routine unavailable</small>':""}</td><td><input class="tariff-input" type="number" min="0" max="1000000" step="1" value="${d.unitCost}" aria-label="${esc(d.name)} units" ${!d.available?"disabled":""}></td><td><input class="tariff-enabled" type="checkbox" aria-label="Enable ${esc(d.name)}" ${d.enabled?"checked":""} ${!d.available?"disabled":""}></td><td><button data-save-tariff="${esc(d.id)}" ${!d.available?"disabled":""}>Save</button></td></tr>`).join("");
 }
 function renderOperations() {
-  $("operations-body").innerHTML=state.operations.map(o=>`<tr><td><b>${esc(o.device_name)}</b><small>${esc(o.username)}</small></td><td>${esc(when(o.created_at))}<small class="monospace">${esc(o.id.slice(0,12))}</small></td><td>${fmt(o.cost)}</td><td>${badge(o.state)}</td><td class="reason-cell">${esc(o.message || (o.state==="authorized"?"Waiting for execution grant":o.state==="executing"?"Awaiting engine outcome":""))}<small>${esc(o.gateway)}</small></td><td>${["applied","executing"].includes(o.state)?`<button data-refund="${esc(o.id)}">Refund</button>`:""}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No unlock operations.</td></tr>';
+  $("operations-body").innerHTML=rows("operations").map(o=>`<tr><td><b>${esc(o.device_name)}</b><small>${esc(o.username)} · ${o.operation_action==="lock"?"Lock":"Unlock"}</small></td><td>${esc(when(o.created_at))}<small class="monospace">${esc(o.id.slice(0,12))}</small></td><td>${fmt(o.cost)}</td><td>${badge(o.state)}</td><td class="reason-cell">${esc(o.message || (o.state==="authorized"?"Waiting for execution grant":o.state==="executing"?"Awaiting engine outcome":""))}<small>${esc(o.gateway)}</small></td><td>${["applied","executing"].includes(o.state)?`<button data-refund="${esc(o.id)}">Refund</button>`:""}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">No device operations.</td></tr>';
 }
 function renderVouchers(){
-  $("vouchers-body").innerHTML=(state.vouchers||[]).map(v=>`<tr><td class="monospace">${esc(v.code_hint)}<small>${esc(when(v.created_at))}</small></td><td>${fmt(v.units)}</td><td class="monospace" title="${esc(v.hwid||'')}">${v.hwid?esc(v.hwid.slice(0,10)+'…'+v.hwid.slice(-6)):'Any authorized hardware'}</td><td>${badge(v.used_at?'redeemed':!v.active?'disabled':v.expires_at&&Number(v.expires_at)<Date.now()/1000?'expired':'active')}</td><td>${esc(v.used_by||'—')}<small>${v.used_at?esc(when(v.used_at)):''}</small></td><td>${!v.used_at&&v.active?`<button data-disable-voucher="${esc(v.id)}">Disable</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No vouchers created.</td></tr>';
+  $("vouchers-body").innerHTML=rows("vouchers").map(v=>`<tr><td class="monospace">${esc(v.code_hint)}<small>${esc(when(v.created_at))}</small></td><td>${fmt(v.units)}</td><td class="monospace" title="${esc(v.hwid||'')}">${v.hwid?esc(v.hwid.slice(0,10)+'…'+v.hwid.slice(-6)):'Any authorized hardware'}</td><td>${badge(v.used_at?'redeemed':!v.active?'disabled':v.expires_at&&Number(v.expires_at)<Date.now()/1000?'expired':'active')}</td><td>${esc(v.used_by||'—')}<small>${v.used_at?esc(when(v.used_at)):''}</small></td><td>${!v.used_at&&v.active?`<button data-disable-voucher="${esc(v.id)}">Disable</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No vouchers created.</td></tr>';
 }
 function renderClientControl(){
   const policy=state.updatePolicy||{};
@@ -47,11 +87,11 @@ function renderClientControl(){
   const selected=$('notification-recipient').value;
   $('notification-recipient').innerHTML='<option value="">All clients</option>'+state.clients.map(c=>`<option value="${esc(c.id)}">${esc(c.username)} · ${esc(c.displayName)}</option>`).join('');
   $('notification-recipient').value=selected;
-  $('notifications-body').innerHTML=(state.notifications||[]).map(n=>`<tr><td><b>${esc(n.title)}</b><small class="reason-cell">${esc(n.message)}</small></td><td>${esc(n.recipient_username||'All clients')}</td><td>${esc(when(n.created_at))}<small>${n.expires_at?'Expires '+esc(when(n.expires_at)):''}</small></td><td>${fmt(n.read_count)}</td><td>${Number(n.active)?`<button data-disable-notification="${esc(n.id)}">Withdraw</button>`:badge('disabled')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No notifications sent.</td></tr>';
+  $('notifications-body').innerHTML=rows("notifications").map(n=>`<tr><td><b>${esc(n.title)}</b><small class="reason-cell">${esc(n.message)}</small></td><td>${esc(n.recipient_username||'All clients')}</td><td>${esc(when(n.created_at))}<small>${n.expires_at?'Expires '+esc(when(n.expires_at)):''}</small></td><td>${fmt(n.read_count)}</td><td>${Number(n.active)?`<button data-disable-notification="${esc(n.id)}">Withdraw</button>`:badge('disabled')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No notifications sent.</td></tr>';
 }
 function clientPayload(c) { return {username:c.username,displayName:c.displayName,hwid:c.hwid,active:c.active,expiresAt:c.expiresAt,password:""}; }
 function openClient(id=null) {
-  const c=id?state.clients.find(x=>x.id===id):null; $("client-form").reset(); $("client-id").value=c?.id||""; $("client-dialog-title").textContent=c?"Edit client":"Add client";
+  const c=id?findRow("clients",id):null; $("client-form").reset(); $("client-id").value=c?.id||""; $("client-dialog-title").textContent=c?"Edit client":"Add client";
   $("client-username").value=c?.username||""; $("client-name").value=c?.displayName||""; $("client-hwid").value=c?.hwid||""; $("client-active").checked=c?c.active:true;
   $("client-password").required=!c; $("initial-units-field").hidden=!!c; $("client-units").value=0;
   $("client-expiry").value=c?.expiresAt?new Date(c.expiresAt*1000-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):"";
@@ -74,20 +114,22 @@ document.addEventListener("click",async event=>{
   if(button.dataset.page){navigate(button.dataset.page);return;}
   if(button.hasAttribute("data-create-client")){openClient();return;}
   if(button.dataset.editClient){openClient(button.dataset.editClient);return;}
-  if(button.dataset.unitsClient){adjustmentClient=state.clients.find(c=>c.id===button.dataset.unitsClient);$("units-form").reset();delete $("units-form").dataset.requestId;$("units-client").textContent=`${adjustmentClient.username} · ${fmt(adjustmentClient.units)} available units`;$("units-dialog").showModal();return;}
-  if(button.dataset.refund){refundOperation=state.operations.find(o=>o.id===button.dataset.refund);$("refund-form").reset();$("refund-description").textContent=`Refund ${fmt(refundOperation.cost)} units to ${refundOperation.username} for ${refundOperation.device_name}.`;$("refund-dialog").showModal();return;}
+  if(button.dataset.unitsClient){adjustmentClient=findRow("clients",button.dataset.unitsClient);$("units-form").reset();delete $("units-form").dataset.requestId;$("units-client").textContent=`${adjustmentClient.username} · ${fmt(adjustmentClient.units)} available units`;$("units-dialog").showModal();return;}
+  if(button.dataset.refund){refundOperation=findRow("operations",button.dataset.refund);$("refund-form").reset();$("refund-description").textContent=`Refund ${fmt(refundOperation.cost)} units to ${refundOperation.username} for ${refundOperation.device_name}.`;$("refund-dialog").showModal();return;}
   try {
-    if(button.dataset.copyHwid){await navigator.clipboard.writeText(state.clients.find(c=>c.id===button.dataset.copyHwid).hwid);notice("Authorized HWID copied.");}
+    if(button.dataset.copyHwid){await navigator.clipboard.writeText(findRow("clients",button.dataset.copyHwid).hwid);notice("Authorized HWID copied.");}
     if(button.dataset.disableVoucher){button.disabled=true;await api('vouchers/'+button.dataset.disableVoucher+'/disable','POST',{});await refresh();notice('Voucher disabled.');}
     if(button.dataset.disableNotification){button.disabled=true;await api('notifications/'+button.dataset.disableNotification+'/disable','POST',{});await refresh();notice('Notification withdrawn.');}
-    if(button.dataset.toggleClient){button.disabled=true;const c=state.clients.find(x=>x.id===button.dataset.toggleClient);await api("clients/"+c.id,"PUT",{...clientPayload(c),active:!c.active});await refresh();notice(c.active?"Client suspended and sessions revoked.":"Client activated.");}
+    if(button.dataset.toggleClient){button.disabled=true;const c=findRow("clients",button.dataset.toggleClient);await api("clients/"+c.id,"PUT",{...clientPayload(c),active:!c.active});await refresh();notice(c.active?"Client suspended and sessions revoked.":"Client activated.");}
     if(button.dataset.saveTariff){button.disabled=true;const row=button.closest("tr");await api("devices/"+button.dataset.saveTariff,"PUT",{unitCost:Number(row.querySelector(".tariff-input").value),enabled:row.querySelector(".tariff-enabled").checked});await refresh();notice("Device tariff saved. New unlocks use the server's updated price.");}
   }catch(error){notice(error.message,true);}finally{button.disabled=false;}
 });
-$("client-search").addEventListener("input",()=>{if(state)renderClients();});
+let searchTimer;
+$("client-search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{if(state)changeRecords("clients",1);},200);});
 $("refresh-button").addEventListener("click",refresh);
 $("password-button").addEventListener("click",()=>{$("password-form").reset();$("password-dialog").showModal();});
 $("logout-button").addEventListener("click",async()=>{try{await api("logout","POST",{});}finally{showLogin();}});
+setupPagination();
 (async()=>{try{const session=await api("session");csrf=session.csrfToken;$("admin-label").textContent=session.username;$("login-screen").hidden=true;$("dashboard").hidden=false;await refresh();}catch{showLogin();}})();
 setInterval(()=>{if(csrf && !document.querySelector("dialog[open]"))refresh();},30000);
 $("create-vouchers").addEventListener('click',()=>{$('voucher-form').reset();$('voucher-dialog').showModal();});

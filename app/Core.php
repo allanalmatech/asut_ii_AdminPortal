@@ -65,6 +65,26 @@ final class Keys {
         return $signed.'.'.self::b64($signature);
     }
     public function completion(array $o): string { return strtoupper(hash_hmac('sha256',"settle|{$o['id']}|{$o['user_id']}|{$o['hwid']}",$this->settlement)); }
+    public function seal(string $value,string $context): string {
+        $iv=random_bytes(12);$tag='';$key=hash_hmac('sha256','ASUTII.Lite.State.v1',$this->settlement,true);
+        $encrypted=openssl_encrypt($value,'aes-256-gcm',$key,OPENSSL_RAW_DATA,$iv,$tag,$context);
+        if($encrypted===false)throw new \RuntimeException('Cannot protect workflow state.');
+        return base64_encode($iv.$tag.$encrypted);
+    }
+    public function unseal(string $value,string $context): string {
+        $raw=base64_decode($value,true);if($raw===false||strlen($raw)<28)throw new \RuntimeException('Invalid protected workflow state.');
+        $key=hash_hmac('sha256','ASUTII.Lite.State.v1',$this->settlement,true);
+        $clear=openssl_decrypt(substr($raw,28),'aes-256-gcm',$key,OPENSSL_RAW_DATA,substr($raw,0,12),substr($raw,12,16),$context);
+        if($clear===false)throw new \RuntimeException('Cannot authenticate workflow state.');return $clear;
+    }
+    public function openBundle(string $blob): string {
+        if(substr($blob,0,8)!=="ASUTWF1\0"||strlen($blob)<40)throw new \RuntimeException('Invalid workflow package.');
+        $length=unpack('N',substr($blob,8,4))[1];
+        if($length<256||$length>1024||strlen($blob)<12+$length+28)throw new \RuntimeException('Invalid workflow package.');
+        $key='';if(!openssl_private_decrypt(substr($blob,12,$length),$key,$this->rsa,OPENSSL_PKCS1_OAEP_PADDING)||strlen($key)!==32)throw new \RuntimeException('Workflow package key mismatch.');
+        $offset=12+$length;$clear=openssl_decrypt(substr($blob,$offset+28),'aes-256-gcm',$key,OPENSSL_RAW_DATA,substr($blob,$offset,12),substr($blob,$offset+12,16),'ASUTII.WorkflowBundle.v1');
+        if($clear===false)throw new \RuntimeException('Workflow package authentication failed.');return $clear;
+    }
 }
 final class Db {
     public \PDO $pdo; public string $prefix;
@@ -106,10 +126,11 @@ final class Web {
         header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     }
     public static function json(array $body,int $status=200): void { http_response_code($status);header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');echo json_encode($body,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);exit; }
-    public static function body(): array {
-        V::need((int)($_SERVER['CONTENT_LENGTH']??0)<=32768,413,'request_too_large','The request is too large.');
+    public static function body(int $limit=32768): array {
+        V::need((int)($_SERVER['CONTENT_LENGTH']??0)<=$limit,413,'request_too_large','The request is too large.');
         V::need(str_contains(strtolower($_SERVER['CONTENT_TYPE']??''),'application/json'),415,'json_required','Use application/json.');
-        $value=json_decode(file_get_contents('php://input',false,null,0,32769),true,32,JSON_THROW_ON_ERROR);
+        $raw=file_get_contents('php://input',false,null,0,$limit+1);V::need(strlen($raw)<=$limit,413,'request_too_large','The request is too large.');
+        $value=json_decode($raw,true,32,JSON_THROW_ON_ERROR);
         V::need(is_array($value)&&($value===[]||array_keys($value)!==range(0,count($value)-1)),400,'invalid_input','A JSON object is required.');return $value;
     }
     public static function bearer(): string { $s=$_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'';return str_starts_with($s,'Bearer ')?substr($s,7):''; }

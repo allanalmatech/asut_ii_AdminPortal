@@ -43,7 +43,7 @@ final class Installer {
     }
     public static function migrate(Db $db): void {
         $version=$db->one("SELECT setting_value FROM {settings} WHERE setting_key='schema_version'");
-        if((int)($version['setting_value']??0)>=5)return;
+        if((int)($version['setting_value']??0)>=6&&$db->one('SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?',[$db->prefix.'lite_jobs']))return;
         $lock='ASUTII:'.substr(hash('sha256',$db->config['db_name'].'/'.$db->prefix),0,40);
         V::need((int)$db->query('SELECT GET_LOCK(?,10)',[$lock])->fetchColumn()===1,503,'migration_busy','Database upgrade is in progress. Retry shortly.');
         try {
@@ -58,7 +58,11 @@ final class Installer {
             if(str_contains($c['CHECK_CLAUSE'],'RESERVE'))$db->pdo->exec('ALTER TABLE `'.$db->prefix.'ledger` DROP CONSTRAINT `'.str_replace('`','``',$c['CONSTRAINT_NAME']).'`');
         $db->query("ALTER TABLE {ledger} ADD CHECK((kind='RESERVE' AND delta<0) OR(kind IN('TOPUP','REFUND','VOUCHER') AND delta>0) OR kind='ADJUSTMENT')");
         }
-        foreach(explode(';',$sql)as$s)if(str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notifications')||str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notification_reads'))$db->pdo->exec($s);
+        foreach(explode(';',$sql)as$s)if(str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notifications')||str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'notification_reads')||str_contains($s,'CREATE TABLE IF NOT EXISTS '.$db->prefix.'lite_jobs'))$db->pdo->exec($s);
+        foreach(['operation_action'=>"ENUM('unlock','lock') NOT NULL DEFAULT 'unlock'",'execution_mode'=>"ENUM('normal','lite') NOT NULL DEFAULT 'normal'"]as$column=>$definition){
+            if(!$db->one('SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?',[$db->prefix.'operations',$column]))
+                $db->query('ALTER TABLE {operations} ADD '.$column.' '.$definition);
+        }
         $catalog=json_decode(file_get_contents(dirname(__DIR__).'/assets/device_catalog.json'),true,32,JSON_THROW_ON_ERROR)['devices'];
         $matching=array_values(array_filter($catalog,static fn($device)=>$device['id']==='G5TS'));
         if(count($matching)!==1||$matching[0]['available']!==true){
@@ -69,6 +73,7 @@ final class Installer {
         }
         $device=$matching[0];$price=array_column(Product::devices(),null,'id')['G5TS'];
         $db->tx(function()use($db,$device,$price,$catalog){
+            foreach($catalog as$entry)$db->query('UPDATE {devices} SET family=?,notes=? WHERE id=?',[$entry['family'],$entry['notes'],$entry['id']]);
             $previous=$db->one("SELECT id FROM {devices} WHERE id='G5TS' FOR UPDATE");
             if($previous===null){
                 $db->query('INSERT INTO {devices}(id,name,family,image,notes,available,unit_cost,enabled,sort_order,updated_at) VALUES(?,?,?,?,?,1,?,1,?,?)',[
@@ -79,7 +84,7 @@ final class Installer {
                 $db->query("UPDATE {devices} SET name=?,family=?,image=?,notes=?,available=1,updated_at=? WHERE id='G5TS'",[
                     $device['name'],$device['family'],$device['image'],$device['notes'],time()]);
             }
-            $db->query("INSERT INTO {settings}(setting_key,setting_value) VALUES('schema_version','5') ON DUPLICATE KEY UPDATE setting_value='5'");
+            $db->query("INSERT INTO {settings}(setting_key,setting_value) VALUES('schema_version','6') ON DUPLICATE KEY UPDATE setting_value='6'");
         });
         } finally {$db->query('SELECT RELEASE_LOCK(?)',[$lock]);}
     }
