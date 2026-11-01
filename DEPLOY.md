@@ -105,7 +105,7 @@ An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
 Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
 requested 10-credit value in **Device tariffs** after deployment.
 
-The corresponding Windows client release is **2.2.0**, build **2026103102**.
+The corresponding Windows client build is **2.2.1**, build **2026110101**.
 The G5TS Lock Device action costs 2 credits, confirmed before authorization;
 unlocking uses the current administrator-configured tariff. Existing balances,
 accounts, tariff edits and transaction history are preserved.
@@ -129,6 +129,32 @@ pinned workflow version across a subsequent resource update.
 The separate Windows package uses normal ASUT II branding and the same account,
 credit ledger and themed router-login screen. Install the matching Windows
 executable after pulling the API release.
+
+### Investigating G5TS progress stopping at 50%
+
+Deploy the updated `app/Lite.php`. The protected workflow transcript can exceed
+1 MiB while preparing the G5TS files. PHP/PDO builds using libmysqlclient can
+limit an individual fetched column to 1 MiB; truncation then fails authenticated
+decryption during both advance and recovery. The updated reader retrieves the
+existing ciphertext in 256 KiB pieces under the operation's row lock and checks
+each length before authenticating it. It retains the existing storage format,
+keys, receipts and billing rules.
+
+The local regression reproduces that driver limit and verifies advance, replay
+and exactly-once safe cancellation. The reported hosted failures still require
+the private PHP error log or the read-only diagnostic to confirm their cause.
+From the hosting terminal, in the portal directory, run:
+
+```text
+php tools/diagnose-lite.php --operation=0149ee2873c3633f728ffd9f1a354d5f
+```
+
+The CLI-only utility reports PHP/PDO versions, stored versus fetched byte counts,
+ciphertext authentication, and the pending step number/progress. It does not
+emit transcript contents, device credentials, completion tokens or private keys,
+and does not advance, settle, refund or alter the job. Preserve `config/local.php`,
+`storage/keys`, the database and existing workflow storage during this code update.
+Replacing the Windows executable alone does not deploy this PHP reader change.
 
 The purchase button opens an email to `asutdev@gmail.com`. After arranging
 payment, the administrator creates/activates the client's HWID-authorized

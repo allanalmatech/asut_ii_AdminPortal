@@ -6,6 +6,28 @@ final class LiteFailure extends \RuntimeException {
     public function __construct(public string $errorCode,string $message,public string $outcome='failed',public bool $restored=false){parent::__construct($message);}
 }
 
+final class LiteTranscript {
+    private const CHUNK_BYTES=262144, MAX_BYTES=13333372;
+    public static function read(Db $db,string $id,bool $lock=false): ?string {
+        // libmysqlclient can cap a single fetched column at 1 MiB. Read the
+        // existing authenticated ciphertext in bounded pieces, under the job
+        // row lock during advance/recovery, without changing its format.
+        $row=$db->one('SELECT OCTET_LENGTH(transcript) AS bytes,SUBSTRING(transcript,1,'.self::CHUNK_BYTES.') AS chunk FROM {lite_jobs} WHERE operation_id=?'.($lock?' FOR UPDATE':''),[$id]);
+        if($row===null)return null;
+        $bytes=(int)$row['bytes'];
+        if($bytes<40||$bytes>self::MAX_BYTES)throw new \RuntimeException('Invalid protected workflow state length.');
+        $text=$row['chunk'];
+        if(!is_string($text)||strlen($text)!==min($bytes,self::CHUNK_BYTES))throw new \RuntimeException('Protected workflow state was truncated by the database driver.');
+        while(strlen($text)<$bytes){
+            $offset=strlen($text);$length=min(self::CHUNK_BYTES,$bytes-$offset);
+            $part=$db->one('SELECT SUBSTRING(transcript,'.($offset+1).','.$length.') AS chunk FROM {lite_jobs} WHERE operation_id=?',[$id]);
+            if(!is_string($part['chunk']??null)||strlen($part['chunk'])!==$length)throw new \RuntimeException('Protected workflow state was truncated by the database driver.');
+            $text.=$part['chunk'];
+        }
+        return $text;
+    }
+}
+
 trait LiteMethods {
     public function liteControl(string $token,string $hwid,array $input): array {
         return $this->db->tx(function()use($token,$hwid,$input){
@@ -61,10 +83,10 @@ trait LiteMethods {
         return $this->authorize($token,$hwid,$input,'lite');
     }
     private function liteState(array $o): array {
-        $row=$this->db->one('SELECT transcript FROM {lite_jobs} WHERE operation_id=? FOR UPDATE',[$o['id']]);
-        if(!$row)return ['context'=>['operationId'=>$o['id'],'deviceId'=>$o['device_id'],'action'=>$o['operation_action'],'gateway'=>$o['gateway']],
+        $transcript=LiteTranscript::read($this->db,$o['id'],true);
+        if($transcript===null)return ['context'=>['operationId'=>$o['id'],'deviceId'=>$o['device_id'],'action'=>$o['operation_action'],'gateway'=>$o['gateway']],
             'results'=>[],'pending'=>null,'unsafe'=>false,'lastAck'=>null,'workflowHash'=>''];
-        return json_decode($this->keys->unseal($row['transcript'],$o['id']),true,64,JSON_THROW_ON_ERROR);
+        return json_decode($this->keys->unseal($transcript,$o['id']),true,64,JSON_THROW_ON_ERROR);
     }
     private function liteSave(array $o,array $state): void {
         $json=json_encode($state,JSON_THROW_ON_ERROR|JSON_UNESCAPED_SLASHES);
