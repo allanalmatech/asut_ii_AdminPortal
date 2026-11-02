@@ -105,7 +105,7 @@ An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
 Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
 requested 10-credit value in **Device tariffs** after deployment.
 
-The corresponding Windows client build is **2.2.1**, build **2026110101**.
+The current lightweight Lite client is **2.3.0**, build **2026110202**.
 The G5TS Lock Device action costs 2 credits, confirmed before authorization;
 unlocking uses the current administrator-configured tariff. Existing balances,
 accounts, tariff edits and transaction history are preserved.
@@ -129,6 +129,13 @@ pinned workflow version across a subsequent resource update.
 The separate Windows package uses normal ASUT II branding and the same account,
 credit ledger and themed router-login screen. Install the matching Windows
 executable after pulling the API release.
+
+The lightweight client bundles Python/.NET and uses the shared Evergreen
+Microsoft Edge WebView2 Runtime for browser-based device actions. It detects a
+missing runtime and offers Microsoft's installation page. G5TS uses the native
+combined device-login screen. A client session supervisor coordinates UI/engine
+shutdown and temporary-file cleanup; it does not change hosted tariffs or make
+uncertain physical outcomes eligible for automatic refunds.
 
 ### Investigating G5TS progress stopping at 50%
 
