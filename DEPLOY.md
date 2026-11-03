@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- PHP 8.0+ (PHP 8.2+ recommended), PDO MySQL, OpenSSL and JSON.
+- 64-bit PHP 8.0+ (PHP 8.2+ recommended), PDO MySQL, OpenSSL and JSON.
 - MySQL **8.0.16+** or MariaDB **10.3+**, including **10.3.39-MariaDB-cll-lve**, with InnoDB tables and `innodb_flush_log_at_trx_commit=1`.
 - Apache/LiteSpeed-compatible `.htaccess`, URL rewriting and authorization headers.
 - A valid HTTPS certificate for the public client API.
@@ -105,12 +105,27 @@ An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
 Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
 requested 10-credit value in **Device tariffs** after deployment.
 
-The current lightweight Lite client is **2.3.0**, build **2026110202**.
+The current lightweight Lite client is **2.4.0**, build **2026110301**.
 The G5TS Lock Device action costs 2 credits, confirmed before authorization;
 unlocking uses the current administrator-configured tariff. Existing balances,
 accounts, tariff edits and transaction history are preserved.
 
 ### Protected workflow deployment
+
+For the 2.4.0 router update, deploy `patches/lite-workflows.bin`,
+`patches/X25.zip`, `patches/G5TS.zip`, `assets/device_catalog.json` and
+`assets/build-info.json`. The X25 selection now includes the verified
+X25A 4.13.1 / TZ7.823.433A / NG0002 configuration package, ASUT branding and
+native automatic-update disablement. Its actual private PHP workflow passed
+the owner-router reboot, branding, native policy and SIM/radio checks.
+
+G5TS B04 workflows now validate the executable code layout and generate each
+router's own patch, including the two supplied binary variants. The second
+variant has offline/simulated verification rather than a claimed live unlock.
+
+Deploy the resources as one matching release. Keep existing private keys and
+versioned `storage_path/workflows` so in-progress jobs retain their pinned
+resources. Windows-only replacement does not update the hosted Lite workflow.
 
 Pull the complete portal release, including `app/Records.php`, `app/Lite.php`,
 `schema.sql` and `patches/lite-workflows.bin`. Keep `config/local.php` and all

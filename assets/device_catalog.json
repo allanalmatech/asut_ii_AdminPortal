@@ -60,7 +60,7 @@
       "defaultGateway": "192.168.1.1",
       "image": "devices/G5TS.png",
       "available": true,
-      "notes": "Connect the device by USB or LAN and follow the on-screen prompts."
+      "notes": "Supported B04 code layouts are detected automatically. Connect by USB or LAN and use an active non-MTN SIM for verification."
     },
     {
       "id": "LT511A",
@@ -135,12 +135,12 @@
     {
       "id": "X25",
       "deviceId": "X25",
-      "name": "ZLT X25",
+      "name": "ZLT X25 / X25A",
       "family": "5G router",
-      "defaultGateway": "192.168.0.1",
+      "defaultGateway": "192.168.1.1",
       "image": "devices/X25.png",
       "available": true,
-      "notes": "Firmware must be below 4.0.2. Insert the operator SIM and wait for a valid cell ID. Only device information is backed up for this configuration-reset routine."
+      "notes": "X25A 4.13.1 (TZ7.823.433A / NG0002): ASUT branding and automatic updates disabled. Older X25 firmware below 4.0.2 uses its legacy routine."
     },
     {
       "id": "X28",
