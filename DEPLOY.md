@@ -49,6 +49,38 @@ The Windows client folder contains only the server's public key. Keep the admini
 
 The upload contains no local database, local demo passwords, Windows runtimes or .NET server. The PHP patch download endpoints read the bundled ZIPs without requiring a PHP ZIP extension.
 
+## Client-Server Mode remote relay
+
+The separate operator/remote apps use **`remote.php`** beside `api.php` at the
+portal root. Pull this endpoint with the matching portal release, preserving
+the current database, configuration, signing keys and workflow bundle. It
+creates only the prefixed `remote_sessions`, `remote_requests` and
+`remote_limits` tables; existing account/operation tables are reused.
+
+The operator signs in with an existing authorized account on its registered
+Windows computer and enters the remote client's expiring nine-digit code.
+Both apps connect outbound over HTTPS. Pairing proofs bind the operator and
+session public keys to the selected device; device RPC messages are encrypted
+between the two apps. The relay stores bounded encrypted request/results for
+idempotent retries, and reads large packets in 256 KiB chunks. Allow 16 MiB
+JSON request bodies and matching database packet limits. Codes expire after
+ten minutes; a paired session lasts up to two hours.
+
+Check readiness using an HTTPS JSON POST to `remote.php`:
+
+```json
+{"action":"health"}
+```
+
+It should identify `ASUT Remote Relay`, protocol 1. A Git push alone does not
+confirm that the hosting checkout has pulled this endpoint.
+
+The operator app retains backups and pending receipts locally, and uses the
+existing Lite signed workflow/tariff/settlement API. The customer app keeps
+transport instructions in memory. Its sweep removes only marked ASUT
+helper/transfer folders after active device I/O and closes the session. It
+does not erase Windows records or remove the customer's downloaded executable.
+
 ## Optional cron
 
 Unused authorizations are expired during account/admin activity. For regular cleanup during idle periods, configure the host's PHP CLI cron:
