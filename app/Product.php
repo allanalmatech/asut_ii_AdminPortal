@@ -8,6 +8,7 @@ final class Product {
     public const CURRENCY='USD';
     public const SUPPORT_EMAIL='asutdev@gmail.com';
     public const G5TS_LOCK_COST=2;
+    public const X25_LOCK_COST=2;
 
     public static function devices(): array {
         return [

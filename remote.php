@@ -4,7 +4,8 @@ declare(strict_types=1);
 // billing remain in that portal; this endpoint transports bounded ciphertext.
 $portal=getenv('ASUT_REMOTE_PORTAL_ROOT')?:__DIR__;
 require $portal.'/app/bootstrap.php';
-use Asut\{ApiError,Db,Keys,Security,Store,V,Web};
+require_once $portal.'/app/RemotePolicy.php';
+use Asut\{ApiError,Db,Keys,LiteTranscript,RemotePolicy,Security,Store,V,Web};
 
 final class AsutRemoteRelay {
     private const MAX_CIPHER=11200000;
@@ -24,6 +25,9 @@ final class AsutRemoteRelay {
           delivered_at BIGINT NULL, completed_at BIGINT NULL,
           PRIMARY KEY(session_id,request_id), INDEX remote_queue(session_id,state,created_at)) ENGINE=InnoDB");
         $db->query("CREATE TABLE IF NOT EXISTS {remote_limits} (bucket CHAR(64) NOT NULL PRIMARY KEY,hits INT NOT NULL,expires_at BIGINT NOT NULL) ENGINE=InnoDB");
+        $db->query("CREATE TABLE IF NOT EXISTS {remote_grants} (session_id CHAR(32) NOT NULL,request_id CHAR(32) NOT NULL,proof TEXT NOT NULL,transport_hash CHAR(64) NOT NULL,scope VARCHAR(16) NOT NULL,operation_id CHAR(32) NULL,step_sequence INT NULL,PRIMARY KEY(session_id,request_id),UNIQUE KEY remote_step_once(operation_id,step_sequence)) ENGINE=InnoDB");
+        $db->query("CREATE TABLE IF NOT EXISTS {remote_jobs} (session_id CHAR(32) NOT NULL PRIMARY KEY,operation_id CHAR(32) NOT NULL UNIQUE,proof TEXT NOT NULL,state VARCHAR(16) NOT NULL,updated_at BIGINT NOT NULL) ENGINE=InnoDB");
+        $db->query("CREATE TABLE IF NOT EXISTS {remote_portals} (session_id CHAR(32) NOT NULL PRIMARY KEY,lease_id CHAR(32) NOT NULL,expires_at BIGINT NOT NULL) ENGINE=InnoDB");
     }
     private function limit(string $kind,string $identity,int $maximum,int $seconds): void {
         $bucket=hash('sha256',$kind.'|'.$identity.'|'.intdiv(time(),$seconds));
@@ -59,9 +63,53 @@ final class AsutRemoteRelay {
     }
     private static function state(array $row): string {return (int)$row['expires_at']<=time()?'expired':$row['state'];}
     private function metadata(array $row): array {
-        return ['success'=>true,'sessionId'=>$row['id'],'state'=>self::state($row),'expiresAt'=>(int)$row['expires_at'],
+        $job=$this->db->one('SELECT operation_id,proof,state FROM {remote_jobs} WHERE session_id=?',[$row['id']]);
+        return ['success'=>true,'protocol'=>2,'sessionId'=>$row['id'],'state'=>self::state($row),'expiresAt'=>(int)$row['expires_at'],
             'operatorPublic'=>$row['operator_public'],'operatorName'=>$row['operator_name'],'pairProof'=>$row['pair_proof'],
-            'clientPublic'=>$row['client_public'],'clientSeen'=>(int)$row['client_seen']];
+            'clientPublic'=>$row['client_public'],'clientSeen'=>(int)$row['client_seen'],'operatorSeen'=>(int)($row['operator_seen']??0),
+            'jobProof'=>$job['proof']??null,'jobState'=>$job['state']??'idle'];
+    }
+    private function operation(array $row,string $id): array {
+        $operation=$this->db->one('SELECT * FROM {operations} WHERE id=? FOR UPDATE',[$id]);
+        $descriptor=json_decode($this->keys->unseal($row['descriptor_sealed'],$row['id'].'-descriptor'),true,16,JSON_THROW_ON_ERROR);
+        V::need($operation&&$operation['user_id']===$row['operator_id']&&$operation['hwid']===$row['operator_hwid']&&$operation['gateway']===$descriptor['gateway']&&$operation['execution_mode']==='lite',403,'remote_operation','The device job is not authorized for this operator and remote connection.');
+        return $operation;
+    }
+    private function jobProof(array $row,array $operation,string $state): string {
+        return $this->keys->sign(['iss'=>'ASUTII','aud'=>'remote-client','kind'=>'remote-job','sessionId'=>$row['id'],'operationId'=>$operation['id'],'deviceId'=>$operation['device_id'],'action'=>$operation['operation_action'],'state'=>$state,'gateway'=>$operation['gateway'],'exp'=>(int)$row['expires_at']]);
+    }
+    private function grant(array $row,array $input,string $request,string $cipher): array {
+        $scope=V::text($input,'scope',16);$summaryText=V::text($input,'summary',262144);$summary=json_decode($summaryText,true,32,JSON_THROW_ON_ERROR);
+        $transportHash=V::text($input,'transportHash',64);V::need(preg_match('/^[a-f0-9]{64}$/D',$transportHash)===1,403,'remote_transport','Invalid transport digest.');
+        V::need(is_array($summary)&&isset($summary['op'],$summary['arguments'])&&count($summary)===2,403,'remote_transport','Only the minimal transport request may be transmitted.');
+        $actual=null;
+        if($scope!=='workflow'||isset($input['transport'])){
+            $text=V::text($input,'transport',4000000);$actual=json_decode($text,true,32,JSON_THROW_ON_ERROR);
+            V::need(is_array($actual)&&hash_equals($transportHash,hash('sha256',$text))&&RemotePolicy::normalized(RemotePolicy::summary($actual))===RemotePolicy::normalized($summary),403,'remote_transport','The request summary does not match the transport.');
+        }
+        $operationId=null;$sequence=null;$critical=false;
+        if($scope==='workflow'){
+            $operationId=V::uuid(V::text($input,'operationId',32));$sequence=V::integer($input,'sequence',1,2000);$nonce=V::text($input,'stepNonce',64);
+            $operation=$this->operation($row,$operationId);$job=$this->db->one('SELECT operation_id,state FROM {remote_jobs} WHERE session_id=? FOR UPDATE',[$row['id']]);
+            V::need($job&&$job['operation_id']===$operationId&&$job['state']==='active'&&$operation['state']==='executing'&&(int)$operation['started_at']+5400>time(),403,'remote_operation','A live authorized device job is required.');
+            $encrypted=LiteTranscript::read($this->db,$operationId,true);V::need($encrypted!==null,403,'remote_step','The authorized workflow step is unavailable.');
+            $state=json_decode($this->keys->unseal($encrypted,$operationId),true,64,JSON_THROW_ON_ERROR);$pending=$state['pending']??null;
+            V::need(empty($state['interrupted'])&&$pending&&$pending['sequence']===$sequence&&hash_equals($pending['nonce'],$nonce),403,'remote_step','The supplied workflow step is not current.');
+            $expected=json_decode($pending['payload'],true,32,JSON_THROW_ON_ERROR);
+            if(($expected['op']??'')==='browser'){V::need($actual!==null,403,'remote_step','Browser request details are required.');RemotePolicy::portal($actual);}
+            else V::need(in_array($expected['op']??'',['http','adb','adb_devices','usb_prepare','ssh'],true)&&RemotePolicy::normalized($summary)===RemotePolicy::normalized(RemotePolicy::summary(RemotePolicy::transport($expected))),403,'remote_step','The transport request differs from its authorized workflow step.');
+            $critical=($expected['critical']??false)===true;
+        }elseif($scope==='portal'){
+            $lease=$this->db->one('SELECT lease_id,expires_at FROM {remote_portals} WHERE session_id=?',[$row['id']]);
+            V::need($lease&&(int)$lease['expires_at']>time()&&hash_equals($lease['lease_id'],V::text($input,'portalLease',32)),403,'remote_portal','An active operator portal session is required.');
+            $job=$this->db->one('SELECT state FROM {remote_jobs} WHERE session_id=?',[$row['id']]);V::need(($job['state']??'')!=='active',409,'remote_busy','The device workflow is still active.');RemotePolicy::portal($actual);
+        }elseif($scope==='sweep'){
+            $job=$this->db->one('SELECT state FROM {remote_jobs} WHERE session_id=?',[$row['id']]);
+            V::need(($job['state']??'')!=='active'&&($actual['op']??'')==='_sweep'&&empty($actual['arguments']),403,'remote_busy','Cleanup requires an idle device session.');
+        }else throw new ApiError(403,'remote_scope','Pairing alone does not authorize device execution.');
+        $proof=$this->keys->sign(['iss'=>'ASUTII','aud'=>'remote-client','kind'=>'remote-exec','sessionId'=>$row['id'],'requestId'=>$request,'scope'=>$scope,
+            'operationId'=>$operationId,'sequence'=>$sequence,'transportHash'=>$transportHash,'summaryHash'=>hash('sha256',$summaryText),'cipherHash'=>hash('sha256',$cipher),'critical'=>$critical,'exp'=>time()+300]);
+        return [$proof,$transportHash,$scope,$operationId,isset($expected)&&($expected['op']??'')==='browser'?null:$sequence];
     }
     private static function cipher(array $input,string $key='cipher'): string {
         $value=V::text($input,$key,self::MAX_CIPHER);V::need(strlen($value)>=40&&preg_match('/^[A-Za-z0-9+\/=]+$/D',$value)===1,400,'remote_packet','Invalid encrypted session packet.');
@@ -81,7 +129,7 @@ final class AsutRemoteRelay {
         return $text;
     }
     public function execute(string $action,array $input): array {
-        if($action==='health')return ['success'=>true,'service'=>'ASUT Remote Relay','protocol'=>1];
+        if($action==='health')return ['success'=>true,'service'=>'ASUT Remote Relay','protocol'=>2,'operationBoundExecution'=>true];
         if($action==='create')return $this->create($input);
         if($action==='pair')return $this->pair($input);
         $id=V::uuid(V::text($input,'sessionId',32));
@@ -90,6 +138,28 @@ final class AsutRemoteRelay {
         return $this->db->tx(function()use($action,$input,$id,$role,$user){
             $row=$this->session($id,$role,$user,!in_array($action,['poll','reply','status','result','close','client_close'],true));
             $this->db->query('UPDATE {remote_sessions} SET '.($role==='client'?'client_seen':'operator_seen').'=? WHERE id=?',[time(),$id]);
+            if($action==='begin_job'){
+                $operation=$this->operation($row,V::uuid(V::text($input,'operationId',32)));
+                V::need(in_array($operation['state'],['authorized','executing'],true),403,'remote_operation','The device job is not active.');
+                $old=$this->db->one('SELECT operation_id,state FROM {remote_jobs} WHERE session_id=? FOR UPDATE',[$id]);
+                V::need(!$old||$old['state']!=='active'||$old['operation_id']===$operation['id'],409,'remote_busy','Another device job is active.');
+                $proof=$this->jobProof($row,$operation,'active');
+                $this->db->query("INSERT INTO {remote_jobs}(session_id,operation_id,proof,state,updated_at) VALUES(?,?,?,'active',?) ON DUPLICATE KEY UPDATE operation_id=VALUES(operation_id),proof=VALUES(proof),state='active',updated_at=VALUES(updated_at)",[$id,$operation['id'],$proof,time()]);
+                return ['success'=>true,'jobProof'=>$proof];
+            }
+            if($action==='end_job'){
+                $operation=$this->operation($row,V::uuid(V::text($input,'operationId',32)));$state=$operation['state'];
+                if(in_array($state,['authorized','executing'],true)){
+                    $encrypted=LiteTranscript::read($this->db,$operation['id'],true);$workflow=$encrypted?json_decode($this->keys->unseal($encrypted,$operation['id']),true,64,JSON_THROW_ON_ERROR):[];
+                    V::need(!empty($workflow['interrupted']),409,'remote_busy','The device job must finish before unlocking its remote controls.');$state='unknown';
+                }
+                $proof=$this->jobProof($row,$operation,$state);$this->db->query("UPDATE {remote_jobs} SET state='done',proof=?,updated_at=? WHERE session_id=? AND operation_id=?",[$proof,time(),$id,$operation['id']]);return ['success'=>true,'jobProof'=>$proof];
+            }
+            if($action==='portal_open'){
+                $job=$this->db->one('SELECT state FROM {remote_jobs} WHERE session_id=?',[$id]);V::need(($job['state']??'')!=='active',409,'remote_busy','Finish the device workflow first.');$lease=Security::id();
+                $this->db->query('INSERT INTO {remote_portals}(session_id,lease_id,expires_at) VALUES(?,?,?) ON DUPLICATE KEY UPDATE lease_id=VALUES(lease_id),expires_at=VALUES(expires_at)',[$id,$lease,min(time()+3600,(int)$row['expires_at'])]);return ['success'=>true,'portalLease'=>$lease];
+            }
+            if($action==='portal_close'){$this->db->query('DELETE FROM {remote_portals} WHERE session_id=?',[$id]);return ['success'=>true];}
             if($action==='status'){
                 $result=$this->metadata($row);$result['descriptor']=json_decode($this->keys->unseal($row['descriptor_sealed'],$id.'-descriptor'),true,16,JSON_THROW_ON_ERROR);return $result;
             }
@@ -97,7 +167,7 @@ final class AsutRemoteRelay {
                 $result=$this->metadata($row);
                 if(self::state($row)==='paired'){
                     $request=$this->db->one("SELECT request_id,state FROM {remote_requests} WHERE session_id=? AND state IN ('pending','delivered') ORDER BY created_at,request_id LIMIT 1 FOR UPDATE",[$id]);
-                    if($request){$this->db->query("UPDATE {remote_requests} SET state='delivered',delivered_at=COALESCE(delivered_at,?) WHERE session_id=? AND request_id=?",[time(),$id,$request['request_id']]);$result['requestId']=$request['request_id'];$result['cipher']=$this->packet($id,$request['request_id'],'payload');}
+                    if($request){$this->db->query("UPDATE {remote_requests} SET state='delivered',delivered_at=COALESCE(delivered_at,?) WHERE session_id=? AND request_id=?",[time(),$id,$request['request_id']]);$result['requestId']=$request['request_id'];$result['cipher']=$this->packet($id,$request['request_id'],'payload');$result['executionProof']=$this->db->one('SELECT proof FROM {remote_grants} WHERE session_id=? AND request_id=?',[$id,$request['request_id']])['proof']??null;}
                 }
                 return $result;
             }
@@ -105,8 +175,10 @@ final class AsutRemoteRelay {
                 $request=V::uuid(V::text($input,'requestId',32));$cipher=self::cipher($input);$hash=hash('sha256',$cipher);
                 $old=$this->db->one('SELECT payload_hash FROM {remote_requests} WHERE session_id=? AND request_id=? FOR UPDATE',[$id,$request]);
                 if($old){V::need(hash_equals($old['payload_hash'],$hash),409,'remote_conflict','The request ID already has different content.');return ['success'=>true,'accepted'=>true];}
+                [$proof,$transportHash,$scope,$operation,$sequence]=$this->grant($row,$input,$request,$cipher);
                 V::need((int)$this->db->one("SELECT count(*) AS count FROM {remote_requests} WHERE session_id=? AND state<>'done'",[$id])['count']===0,409,'remote_busy','Another remote request is in progress.');
                 V::need((int)$this->db->one('SELECT count(*) AS count FROM {remote_requests} WHERE session_id=?',[$id])['count']<2200,409,'remote_capacity','The session request limit was reached.');
+                $this->db->query('INSERT INTO {remote_grants}(session_id,request_id,proof,transport_hash,scope,operation_id,step_sequence) VALUES(?,?,?,?,?,?,?)',[$id,$request,$proof,$transportHash,$scope,$operation,$sequence]);
                 $this->db->query("INSERT INTO {remote_requests}(session_id,request_id,payload,payload_hash,state,created_at) VALUES(?,?,?,?,'pending',?)",[$id,$request,$cipher,$hash,time()]);return ['success'=>true,'accepted'=>true];
             }
             if($action==='reply'){
@@ -121,10 +193,11 @@ final class AsutRemoteRelay {
                 $done=($saved['state']??'')==='done';return ['success'=>true,'state'=>self::state($row),'done'=>$done,'cipher'=>$done?$this->packet($id,$request,'result'):null];
             }
             if(in_array($action,['close','client_close'],true)){
+                $job=$this->db->one('SELECT state FROM {remote_jobs} WHERE session_id=?',[$id]);V::need(($job['state']??'')!=='active',409,'remote_busy','The authorized device job is still active.');
                 $this->db->query("UPDATE {remote_sessions} SET state='closed',code_hash=NULL WHERE id=?",[$id]);
                 // Only the operator explicitly purges a completed session. Device
                 // workflow/billing recovery remains in the original portal.
-                if($action==='close')$this->db->query('DELETE FROM {remote_requests} WHERE session_id=?',[$id]);
+                if($action==='close'){$this->db->query('DELETE FROM {remote_requests} WHERE session_id=?',[$id]);$this->db->query('DELETE FROM {remote_grants} WHERE session_id=?',[$id]);$this->db->query('DELETE FROM {remote_portals} WHERE session_id=?',[$id]);}
                 return ['success'=>true,'state'=>'closed'];
             }
             throw new ApiError(404,'remote_action','Unknown remote action.');

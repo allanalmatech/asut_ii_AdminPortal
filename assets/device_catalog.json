@@ -140,7 +140,7 @@
       "defaultGateway": "192.168.1.1",
       "image": "devices/X25.png",
       "available": true,
-      "notes": "X25A 4.13.1 (TZ7.823.433A / NG0002): ASUT branding and automatic updates disabled. Older X25 firmware below 4.0.2 uses its legacy routine."
+      "notes": "X25A 4.13.1 (TZ7.823.433A / NG0002): ASUT unlock and carrier re-lock, with saved recovery and automatic updates disabled. Older X25 firmware below 4.0.2 uses its legacy unlock routine."
     },
     {
       "id": "X28",

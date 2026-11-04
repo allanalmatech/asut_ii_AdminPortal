@@ -53,9 +53,11 @@ The upload contains no local database, local demo passwords, Windows runtimes or
 
 The separate operator/remote apps use **`remote.php`** beside `api.php` at the
 portal root. Pull this endpoint with the matching portal release, preserving
-the current database, configuration, signing keys and workflow bundle. It
-creates only the prefixed `remote_sessions`, `remote_requests` and
-`remote_limits` tables; existing account/operation tables are reused.
+the current database, configuration, signing keys and workflow bundle. Deploy
+`app/RemotePolicy.php` together with `remote.php`. Protocol 2 creates the prefixed
+`remote_sessions`, `remote_requests`, `remote_limits`, `remote_grants`,
+`remote_jobs` and `remote_portals` tables; existing account/operation tables
+are reused.
 
 The operator signs in with an existing authorized account on its registered
 Windows computer and enters the remote client's expiring nine-digit code.
@@ -72,14 +74,28 @@ Check readiness using an HTTPS JSON POST to `remote.php`:
 {"action":"health"}
 ```
 
-It should identify `ASUT Remote Relay`, protocol 1. A Git push alone does not
-confirm that the hosting checkout has pulled this endpoint.
+It should identify `ASUT Remote Relay`, protocol **2**, with
+`operationBoundExecution: true`. Use the matching **ASUT Remote/Server 1.1**
+applications. A Git push alone does not confirm the hosting checkout pulled it.
+
+Pairing alone does not grant device execution. Workflow requests must match the
+authorized pending Lite operation/sequence/nonce, and receive a short-lived signed
+grant bound to the session, request, transport digest and ciphertext. The client
+verifies that proof. Large script/data summaries avoid duplicate payload traffic.
+Manual dashboard requests use a separately restricted portal lease supporting
+login and normal APN/settings without authorizing firmware or shell/file access.
+The customer application has no editable relay address. Changing the endpoint or
+pinned key requires rebuilding the remote/operator release.
 
 The operator app retains backups and pending receipts locally, and uses the
 existing Lite signed workflow/tariff/settlement API. The customer app keeps
 transport instructions in memory. Its sweep removes only marked ASUT
-helper/transfer folders after active device I/O and closes the session. It
-does not erase Windows records or remove the customer's downloaded executable.
+helper/transfer folders after active device I/O and closes the session. A headless
+supervisor continues active device work and cleanup if the main GUI closes; it
+has no window or taskbar entry. Normal Stop/Close is blocked during a job. Both
+Windows x64 EXEs include their .NET runtime. Owned assemblies are obfuscated and
+ASUT release-integrity signed; trusted Authenticode signing awaits a valid Code
+Signing certificate. The supplied TLS PFX cannot provide that publisher signature.
 
 ## Optional cron
 
@@ -137,19 +153,24 @@ An existing portal receives the ZTE G5TS entry with an initial 10-credit tariff.
 Existing G5TS tariff edits and enable/disable choices are preserved. Verify the
 requested 10-credit value in **Device tariffs** after deployment.
 
-The current lightweight Lite client is **2.4.0**, build **2026110301**.
-The G5TS Lock Device action costs 2 credits, confirmed before authorization;
+The current lightweight Lite client is **2.4.1**, build **2026110401**.
+The G5TS and supported X25A Lock Device actions cost 2 credits, confirmed before authorization;
 unlocking uses the current administrator-configured tariff. Existing balances,
 accounts, tariff edits and transaction history are preserved.
 
 ### Protected workflow deployment
 
-For the 2.4.0 router update, deploy `patches/lite-workflows.bin`,
+For the 2.4.1 router update, deploy `app/Store.php`, `app/Product.php`, `patches/lite-workflows.bin`,
 `patches/X25.zip`, `patches/G5TS.zip`, `assets/device_catalog.json` and
 `assets/build-info.json`. The X25 selection now includes the verified
 X25A 4.13.1 / TZ7.823.433A / NG0002 configuration package, ASUT branding and
 native automatic-update disablement. Its actual private PHP workflow passed
-the owner-router reboot, branding, native policy and SIM/radio checks.
+the owner-router reboot, branding, native policy and SIM/radio checks. Lite and
+Client-Server Mode now also support X25A re-lock: restore the router's saved
+original carrier allow list, enable native restriction and remove the NCK-success
+marker while retaining APN/Wi-Fi/LAN/credentials and keeping automatic updates off.
+The owner unit passed an unlock-to-re-lock cycle. Stock already-locked detection
+performs no persistent mutation and follows the normal safe cancellation rules.
 
 G5TS B04 workflows now validate the executable code layout and generate each
 router's own patch, including the two supplied binary variants. The second

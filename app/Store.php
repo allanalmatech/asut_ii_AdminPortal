@@ -39,7 +39,7 @@ final class Store {
         V::need($allowed,429,'rate_limited','Too many login attempts. Try again in a minute.');
     }
     private function publicClient(array $u): array { return ['id'=>$u['id'],'username'=>$u['username'],'displayName'=>$u['display_name'],'hwid'=>$u['hwid'],'active'=>(bool)$u['active'],'units'=>(int)$u['units'],'expiresAt'=>$u['expires_at']===null?null:(int)$u['expires_at'],'createdAt'=>(int)$u['created_at'],'updatedAt'=>(int)$u['updated_at']]; }
-    private function publicDevice(array $d): array { return ['id'=>$d['id'],'name'=>$d['name'],'family'=>$d['family'],'image'=>$d['image'],'available'=>(bool)$d['available'],'enabled'=>(bool)$d['enabled'],'unitCost'=>(int)$d['unit_cost'],'lockCost'=>$d['id']==='G5TS'?Product::G5TS_LOCK_COST:0,'notes'=>$d['notes']]; }
+    private function publicDevice(array $d): array { return ['id'=>$d['id'],'name'=>$d['name'],'family'=>$d['family'],'image'=>$d['image'],'available'=>(bool)$d['available'],'enabled'=>(bool)$d['enabled'],'unitCost'=>(int)$d['unit_cost'],'lockCost'=>$d['id']==='G5TS'?Product::G5TS_LOCK_COST:($d['id']==='X25'?Product::X25_LOCK_COST:0),'notes'=>$d['notes']]; }
     private function account(array $u): array { return ['user'=>$this->publicClient($u),'devices'=>array_map(fn($d)=>$this->publicDevice($d),$this->db->all('SELECT * FROM {devices} WHERE available=1 ORDER BY sort_order')),'update'=>$this->updateState(),'notifications'=>$this->notificationsFor($u['id']),'serverTime'=>time()]; }
     private function clientSession(string $token,string $hwid): array {
         V::need(strlen($token)>=32&&strlen($token)<=256,401,'login_required','Please log in.');$hwid=V::hwid($hwid);$hash=Security::tokenHash($token);
@@ -76,13 +76,13 @@ final class Store {
     public function authorize(string $token,string $hwid,array $a,string $mode='normal'): array {return $this->db->tx(function()use($token,$hwid,$a,$mode){
         $this->requireCurrentClient();
         $u=$this->clientSession($token,$hwid);$request=V::uuid(V::text($a,'requestId',64));$device=V::text($a,'deviceId',32);$gateway=V::gateway(V::text($a,'gateway',45));
-        $action=$a['action']??'unlock';V::need(is_string($action)&&in_array($action,['unlock','lock'],true)&&($action!=='lock'||$device==='G5TS'),400,'invalid_action','This device action is not available.');
+        $action=$a['action']??'unlock';V::need(is_string($action)&&in_array($action,['unlock','lock'],true)&&($action!=='lock'||$device==='G5TS'||$device==='X25'&&$mode==='lite'),400,'invalid_action','This device action is not available.');
         V::need(in_array($mode,['normal','lite'],true),400,'invalid_mode','Invalid operation mode.');
         $o=$this->db->one('SELECT * FROM {operations} WHERE user_id=? AND request_id=? FOR UPDATE',[$u['id'],$request]);
         if($o){V::need($o['device_id']===$device&&$o['gateway']===$gateway&&$o['operation_action']===$action&&$o['execution_mode']===$mode,409,'idempotency_conflict','The request ID was used for different operation details.');V::need($o['state']==='authorized',409,'operation_already_used','This operation already started or was settled.');return ['success'=>true,'receipt'=>$this->receipt($o)];}
         $d=$this->db->one('SELECT * FROM {devices} WHERE id=? FOR UPDATE',[$device]);
         V::need($d&&(bool)$d['available']&&(bool)$d['enabled']&&(int)$d['unit_cost']>0,403,'device_disabled','This device is unavailable or its tariff is disabled.');
-        $cost=$action==='lock'?Product::G5TS_LOCK_COST:(int)$d['unit_cost'];V::need((int)$u['units']>=$cost,402,'insufficient_units',"This action requires $cost credits; the account has {$u['units']}.");
+        $cost=$action==='lock'?($device==='X25'?Product::X25_LOCK_COST:Product::G5TS_LOCK_COST):(int)$d['unit_cost'];V::need((int)$u['units']>=$cost,402,'insufficient_units',"This action requires $cost credits; the account has {$u['units']}.");
         $id=Security::id();$this->db->query("INSERT INTO {operations}(id,user_id,request_id,device_id,operation_action,execution_mode,gateway,hwid,cost,state,created_at,authorized_until,message) VALUES(?,?,?,?,?,?,?,?,?,'authorized',?,?,'')",[$id,$u['id'],$request,$device,$action,$mode,$gateway,V::hwid($hwid),$cost,time(),time()+120]);
         $this->ledger($u['id'],'RESERVE',-$cost,ucfirst($action).' authorization: '.$device,$id);$this->audit($u['username'],strtoupper($action).'_AUTHORIZED',$id,"$device: reserved $cost credits");
         return ['success'=>true,'receipt'=>$this->receipt($this->db->one('SELECT * FROM {operations} WHERE id=?',[$id]))];
