@@ -47,6 +47,26 @@ The Windows client folder contains only the server's public key. Keep the admini
 - Direct web requests to `config`, `app`, `storage`, `tools` and `patches` must be denied. Patches are delivered only through the authenticated API.
 - Ensure TLS is enabled/forced by the hosting panel. The desktop refuses remote HTTP API URLs.
 
+### Desktop login or relay shows “Bot Verification”
+
+The desktop requires JSON responses. A hosting browser-challenge page can return
+HTTP 200 with HTML, producing an invalid-JSON login error or an unavailable-relay
+message even when the PHP endpoint is deployed. Health checks with another user
+agent can still succeed.
+
+Deploy the matching **`.htaccess`**, including its LiteSpeed API-only
+`verifycaptcha:off` rule for `api/`, `api.php` and `remote.php`. Keep existing
+account/HWID validation, rate limits and signed execution grants enabled. If the
+host applies its challenge before per-directory rules, ask hosting support to
+exempt these API/relay paths from browser verification at the virtual-host/WAF
+level. A desktop application cannot complete a browser CAPTCHA during API RPC.
+
+Check relay health using the application's user agent (`ASUT-Remote/1.1`) and
+`Accept: application/json`; expect JSON with protocol 2 and
+`operationBoundExecution: true`. A request to the login endpoint with missing
+required fields must return a JSON validation error, not a Bot Verification page.
+Reference: https://docs.litespeedtech.com/lsws/cp/cpanel/recaptcha/#define-captcha-actions-through-rewrite-rules
+
 The upload contains no local database, local demo passwords, Windows runtimes or .NET server. The PHP patch download endpoints read the bundled ZIPs without requiring a PHP ZIP extension.
 
 ## Client-Server Mode remote relay

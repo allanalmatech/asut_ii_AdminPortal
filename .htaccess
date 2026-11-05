@@ -1,6 +1,11 @@
 Options -Indexes
 DirectoryIndex index.php
 RewriteEngine On
+# Desktop API and relay clients cannot complete browser CAPTCHA challenges.
+# Application account/HWID checks, signed grants and rate limits remain active.
+<IfModule LiteSpeed>
+RewriteRule ^(?:api(?:/|\.php$)|remote\.php$) - [E=verifycaptcha:off,NC]
+</IfModule>
 RewriteRule ^(?:app|config|storage|tools|patches)(?:/|$) - [F,L,NC]
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^api/(.*)$ api.php?route=$1 [QSA,L]
