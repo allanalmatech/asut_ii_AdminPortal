@@ -225,7 +225,23 @@ combined device-login screen. A client session supervisor coordinates UI/engine
 shutdown and temporary-file cleanup; it does not change hosted tariffs or make
 uncertain physical outcomes eligible for automatic refunds.
 
-### Investigating G5TS progress stopping at 50%
+### Inspecting an unconfirmed Lite/remote operation
+
+The authenticated owner-account route
+`GET api/client/lite/OPERATION_ID/diagnostics` reports acknowledged-step metadata,
+the last transport status, unsafe/interrupted flags and a read-only replay failure
+message from the operation's pinned workflow. X25A reports include recorded update
+image acknowledgements and selected SIM/radio status fields. They distinguish a
+verified native-update acknowledgement from missing cellular registration without
+reapplying the device update.
+
+Deploy matching `api.php` and `app/Lite.php` together. The endpoint requires the
+original operation owner and HWID. It does not send device commands, change the
+transcript or settle/refund an operation, and omits credentials, tokens, workflow
+payloads, router identifiers and backup data. Preserve existing keys and versioned
+workflow storage so an interrupted operation retains its original resources.
+
+### Investigating G5TS progress stopping at 50% (CLI)
 
 Deploy the updated `app/Lite.php`. The protected workflow transcript can exceed
 1 MiB while preparing the G5TS files. PHP/PDO builds using libmysqlclient can

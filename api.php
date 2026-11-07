@@ -29,6 +29,7 @@ try {
     if($route==='client/lite/control'&&$method==='POST')Web::json($store->liteControl($bearer,$hwid,Web::body()));
     if(preg_match('~^client/lite/([a-fA-F0-9-]+)/advance$~D',$route,$m)&&$method==='POST')Web::json($store->liteAdvance($bearer,$hwid,$m[1],Web::body(8000000)));
     if(preg_match('~^client/lite/([a-fA-F0-9-]+)/recover$~D',$route,$m)&&$method==='POST')Web::json($store->liteRecover($m[1],Web::body()));
+    if(preg_match('~^client/lite/([a-fA-F0-9-]+)/diagnostics$~D',$route,$m)&&$method==='GET')Web::json($store->liteDiagnostics($bearer,$hwid,$m[1]));
     if(preg_match('~^client/unlocks/([a-fA-F0-9-]+)/start$~D',$route,$m)&&$method==='POST')Web::json($store->start($bearer,$hwid,$m[1],Web::body()));
     if(preg_match('~^client/unlocks/([a-fA-F0-9-]+)/complete$~D',$route,$m)&&$method==='POST')Web::json($store->complete($m[1],Web::body()));
     if($route==='admin/login'&&$method==='POST'){$result=$store->adminLogin(Web::body());Web::adminCookie($result['token'],time()+28800);Web::json($result['body']);}

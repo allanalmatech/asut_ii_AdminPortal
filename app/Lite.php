@@ -179,4 +179,43 @@ trait LiteMethods {
             return $this->liteUnknown($o);
         });
     }
+    public function liteDiagnostics(string $token,string $hwid,string $id): array {
+        return $this->db->tx(function()use($token,$hwid,$id){
+            $u=$this->clientSession($token,$hwid);$hwid=V::hwid($hwid);$id=V::uuid($id);
+            $o=$this->db->one('SELECT * FROM {operations} WHERE id=? AND user_id=? FOR UPDATE',[$id,$u['id']]);
+            V::need($o!==null&&$o['execution_mode']==='lite'&&hash_equals($o['hwid'],$hwid),404,'operation_missing','Operation not found.');
+            $report=['success'=>true,'readOnly'=>true,'operationId'=>$id,'deviceId'=>$o['device_id'],'action'=>$o['operation_action'],'state'=>$o['state'],'jobPresent'=>false];
+            $encrypted=LiteTranscript::read($this->db,$id,true);if($encrypted===null)return $report;
+            $state=json_decode($this->keys->unseal($encrypted,$id),true,64,JSON_THROW_ON_ERROR);$report['jobPresent']=true;
+            $report['acknowledgedSteps']=count($state['results']??[]);$report['unsafe']=($state['unsafe']??false)===true;$report['interrupted']=($state['interrupted']??false)===true;
+            $root=$this->liteRoot($state['bundleVersion']??null);$images=[];$image=null;
+            if($o['device_id']==='X25')foreach(['X25A.bin','X25A.lock.bin','X25A.verify.bin','X25A.locked.verify.bin']as$name)if(is_file($root.'/assets/'.$name))$images[$name]=file_get_contents($root.'/assets/'.$name);
+            try{
+                $factory=require $root.'/workflows.php';$flow=$factory($state['context'],$root);
+                foreach($state['results']as$index=>$result){
+                    if(!$flow->valid())break;$step=$flow->current();$args=$step['arguments']??[];$sequence=$index+1;
+                    $report['lastStep']=['sequence'=>$sequence,'transport'=>$step['op'],'progress'=>$step['progress']??null,'mutates'=>($step['mutates']??false)===true];
+                    if(!empty($step['mutates'])&&!isset($report['firstMutatingStep']))$report['firstMutatingStep']=$sequence;
+                    $report['lastResponse']=['ok'=>$result['ok']??null,'status'=>$result['status']??null];
+                    if($images&&($step['op']??'')==='http'){
+                        $request=base64_decode($args['data']??'',true)?:'';$path=$args['path']??'';
+                        if(str_starts_with($path,'/cgi-bin/http.cgi?')&&str_contains($path,'cmd=5'))foreach($images as$name=>$bytes)if(str_contains($request,$bytes)){$image=$name;break;}
+                        $command=json_decode($request,true);$reply=json_decode(base64_decode($result['data']??'',true)?:'',true);
+                        if(is_array($command)&&is_array($reply)){
+                            if(($command['cmd']??null)===106&&$image!==null)$report['x25aImageAcknowledgements'][]=['resource'=>$image,'accepted'=>($result['ok']??false)===true&&($result['status']??0)===200&&($reply['success']??false)===true];
+                            if(in_array($command['cmd']??null,[113,133],true)){
+                                $safe=[];foreach(['lock_plmn_flag','sim_status','network_type_str','network_status','signal_lvl','lock_pin_flag','roam_status']as$key)if(array_key_exists($key,$reply))$safe[$key]=$reply[$key];
+                                $safe['cellObserved']=(trim((string)($reply['CELL_ID']??''))?:trim((string)($reply['CELL_ID_5G']??'')))!=='';$safe['wanIpAssigned']=filter_var($reply['wan_ip']??'',FILTER_VALIDATE_IP)!==false&&($reply['wan_ip']??'')!=='0.0.0.0';
+                                $report['lastX25aRadio'][(string)$command['cmd']]=$safe;
+                            }
+                        }
+                    }
+                    $flow->send($result);
+                }
+                $report['replayFinished']=!$flow->valid();
+                if($flow->valid()){$pending=$flow->current();$report['nextStep']=['transport'=>$pending['op']??null,'progress'=>$pending['progress']??null];}
+            }catch(\Throwable $error){$report['replayErrorKind']=get_class($error);if($error instanceof LiteFailure){$report['replayErrorCode']=$error->errorCode;$report['replayMessage']=$error->getMessage();}}
+            return $report;
+        });
+    }
 }
