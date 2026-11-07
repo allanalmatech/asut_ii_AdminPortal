@@ -104,6 +104,11 @@ grant bound to the session, request, transport digest and ciphertext. The client
 verifies that proof. Large script/data summaries avoid duplicate payload traffic.
 Manual dashboard requests use a separately restricted portal lease supporting
 login and normal APN/settings without authorizing firmware or shell/file access.
+The current `app/RemotePolicy.php` permits public Tozed `html/sys/*.html` and
+`js/sys/*.js` GET/HEAD assets plus the normal command-233 GET login-session refresh.
+The native `/sys` filesystem, traversal, firmware operations and command-bearing
+session-refresh requests remain blocked. Deploy that policy with the relay when
+dashboard system pages or session renewal are unavailable through mirroring.
 The customer application has no editable relay address. Changing the endpoint or
 pinned key requires rebuilding the remote/operator release.
 
